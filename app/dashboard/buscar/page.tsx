@@ -11,7 +11,7 @@ import { useCustodiados } from '@/hooks/useAPI';
 export default function BuscarPage() {
   const router = useRouter();
   const { custodiados, loading: loadingCustodiados } = useCustodiados();
-  
+
   const [busca, setBusca] = useState('');
   const [resultados, setResultados] = useState<CustodiadoData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,8 +27,16 @@ export default function BuscarPage() {
       .trim();
   }, []);
 
-  const isEmConformidade = (status: string): boolean => {
-    return status === 'EM_CONFORMIDADE' || status === 'em conformidade';
+  const isEmConformidade = (status: string | undefined): boolean => {
+    if (!status) return false;
+    const s = String(status).toUpperCase();
+    return s === 'EM_CONFORMIDADE' || s === 'EM CONFORMIDADE';
+  };
+
+  const isInadimplente = (status: string | undefined): boolean => {
+    if (!status) return false;
+    const s = String(status).toUpperCase();
+    return s === 'INADIMPLENTE';
   };
 
   const handleBusca = () => {
@@ -42,7 +50,7 @@ export default function BuscarPage() {
 
     setLoading(true);
     setHasSearched(true);
-    
+
     setTimeout(() => {
       const termo = normalizarTexto(busca);
 
@@ -57,10 +65,11 @@ export default function BuscarPage() {
 
       if (filtroStatus !== 'todos') {
         resultadosFiltrados = resultadosFiltrados.filter(item => {
+          const statusStr = item.status ? String(item.status) : '';
           if (filtroStatus === 'EM_CONFORMIDADE') {
-            return isEmConformidade(item.status);
+            return isEmConformidade(statusStr);
           }
-          return item.status === 'INADIMPLENTE' || item.status === 'inadimplente';
+          return isInadimplente(statusStr);
         });
       }
 
@@ -80,19 +89,19 @@ export default function BuscarPage() {
     setHasSearched(false);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | undefined) => {
     return isEmConformidade(status)
-      ? 'bg-green-100 text-green-800' 
+      ? 'bg-green-100 text-green-800'
       : 'bg-red-100 text-red-800';
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string | undefined) => {
     return isEmConformidade(status) ? 'Em Conformidade' : 'Inadimplente';
   };
 
   const getUrgencyInfo = (data: string | undefined) => {
     if (!data) return null;
-    
+
     const hoje = new Date().toDateString();
     const comparecimento = new Date(data).toDateString();
     const diasRestantes = Math.ceil((new Date(data).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -126,7 +135,7 @@ export default function BuscarPage() {
           <h1 className="text-xl font-bold text-primary-dark mb-2">
             Buscar Pessoa
           </h1>
-          
+
           {/* Barra de Busca */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
@@ -148,18 +157,17 @@ export default function BuscarPage() {
                 </button>
               )}
             </div>
-            
+
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-3 rounded-lg border transition-colors ${
-                showFilters || filtroStatus !== 'todos' 
-                  ? 'bg-primary text-white border-primary' 
+              className={`px-4 py-3 rounded-lg border transition-colors ${showFilters || filtroStatus !== 'todos'
+                  ? 'bg-primary text-white border-primary'
                   : 'bg-white text-gray-600 border-gray-300'
-              }`}
+                }`}
             >
               <Filter className="w-5 h-5" />
             </button>
-            
+
             <button
               onClick={handleBusca}
               disabled={loading || !busca.trim()}
@@ -182,31 +190,28 @@ export default function BuscarPage() {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setFiltroStatus('todos')}
-                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    filtroStatus === 'todos'
+                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${filtroStatus === 'todos'
                       ? 'bg-primary text-white'
                       : 'bg-white text-gray-600 border border-gray-300'
-                  }`}
+                    }`}
                 >
                   Todos
                 </button>
                 <button
                   onClick={() => setFiltroStatus('EM_CONFORMIDADE')}
-                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    filtroStatus === 'EM_CONFORMIDADE'
+                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${filtroStatus === 'EM_CONFORMIDADE'
                       ? 'bg-green-500 text-white'
                       : 'bg-white text-gray-600 border border-gray-300'
-                  }`}
+                    }`}
                 >
                   Conformidade
                 </button>
                 <button
                   onClick={() => setFiltroStatus('INADIMPLENTE')}
-                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    filtroStatus === 'INADIMPLENTE'
+                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${filtroStatus === 'INADIMPLENTE'
                       ? 'bg-red-500 text-white'
                       : 'bg-white text-gray-600 border border-gray-300'
-                  }`}
+                    }`}
                 >
                   Inadimplente
                 </button>
@@ -239,13 +244,13 @@ export default function BuscarPage() {
         {resultados.length > 0 && (
           <div className="space-y-3">
             {resultados.map((pessoa, index) => {
-              const proximoComp = typeof pessoa.proximoComparecimento === 'string' 
-                ? pessoa.proximoComparecimento 
-                : pessoa.proximoComparecimento instanceof Date 
-                  ? pessoa.proximoComparecimento.toISOString().split('T')[0] 
+              const proximoComp = typeof pessoa.proximoComparecimento === 'string'
+                ? pessoa.proximoComparecimento
+                : pessoa.proximoComparecimento instanceof Date
+                  ? pessoa.proximoComparecimento.toISOString().split('T')[0]
                   : undefined;
               const urgencyInfo = proximoComp ? getUrgencyInfo(proximoComp) : null;
-              
+
               return (
                 <div
                   key={pessoa.id || index}
@@ -276,7 +281,7 @@ export default function BuscarPage() {
                         <FileText className="w-3.5 h-3.5" />
                         <span>Processo: {pessoa.processo}</span>
                       </div>
-                      
+
                       {proximoComp && (
                         <div className="flex items-center gap-2 text-xs text-gray-600">
                           <Calendar className="w-3.5 h-3.5" />
@@ -285,8 +290,8 @@ export default function BuscarPage() {
                       )}
 
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pessoa.status)}`}>
-                          {getStatusLabel(pessoa.status)}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pessoa.status ? String(pessoa.status) : undefined)}`}>
+                          {getStatusLabel(pessoa.status ? String(pessoa.status) : undefined)}
                         </span>
                       </div>
                     </div>
@@ -295,11 +300,10 @@ export default function BuscarPage() {
                   {/* Botão de Ação */}
                   <button
                     onClick={() => handleConfirmarPresenca(pessoa.processo)}
-                    className={`w-full p-3 font-medium text-sm flex items-center justify-center gap-2 transition-colors ${
-                      urgencyInfo?.urgent
+                    className={`w-full p-3 font-medium text-sm flex items-center justify-center gap-2 transition-colors ${urgencyInfo?.urgent
                         ? 'bg-green-500 text-white hover:bg-green-600'
                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-t'
-                    }`}
+                      }`}
                   >
                     Confirmar Comparecimento
                     <ChevronRight className="w-4 h-4" />
@@ -320,7 +324,7 @@ export default function BuscarPage() {
             <p className="text-gray-500 text-center text-sm px-8">
               Digite o nome, CPF ou número do processo para encontrar rapidamente
             </p>
-            
+
             {/* Dicas de busca */}
             <div className="mt-8 w-full max-w-sm">
               <h4 className="text-sm font-medium text-gray-700 mb-3">Dicas de busca:</h4>
