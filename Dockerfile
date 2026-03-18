@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Copiar arquivos de dependências
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Rebuild do código fonte apenas quando necessário
 FROM base AS builder
