@@ -1,3 +1,5 @@
+// lib/utils/inputFormatters.ts - FIXED: periodicidade and RG formatting
+
 import { ValidationNumericKey, ValidationAlphabeticKey, ValidationPhoneKey } from './validation';
 
 export const InputFormatCPF = (value: string): string => {
@@ -9,12 +11,15 @@ export const InputFormatCPF = (value: string): string => {
   return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9)}`;
 };
 
+// ✅ FIX: RG agora aceita até 10 caracteres (8-9 dígitos + formatação)
+// RG tradicional tem 8 ou 9 dígitos incluindo dígito verificador
 export const InputFormatRG = (value: string): string => {
-  const numbers = value.replace(/\D/g, '').slice(0, 9);
+  const numbers = value.replace(/\D/g, '').slice(0, 10); // ✅ Aumentado de 9 para 10
   
   if (numbers.length <= 2) return numbers;
   if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
   if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
+  // Para 9 ou 10 dígitos
   return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}-${numbers.slice(8)}`;
 };
 
@@ -58,15 +63,22 @@ export const InputFormatName = (value: string): string => {
   return cleaned;
 };
 
+// ✅ FIX: Periodicidade - aceita apenas números positivos, sem zeros à esquerda
 export const InputFormatPeriodicidade = (value: string): string => {
-  const numbers = value.replace(/\D/g, '');
-  const num = parseInt(numbers);
+  // Remove tudo que não é número
+  const numbers = value.replace(/[^0-9]/g, '');
   
-  if (isNaN(num)) return '';
+  // Remove zeros à esquerda
+  const cleaned = numbers.replace(/^0+/, '') || '';
+  
+  if (!cleaned) return '';
+  
+  const num = parseInt(cleaned);
+  
+  // Limitar ao máximo de 365
   if (num > 365) return '365';
-  if (num < 1 && numbers.length > 0) return '1';
   
-  return numbers.slice(0, 3);
+  return cleaned.slice(0, 3);
 };
 
 export const InputFormatAddressNumber = (value: string): string => {
@@ -97,10 +109,9 @@ export const INPUT_MASKS: Record<string, InputMask> = {
   },
   rg: {
     format: InputFormatRG,
-    maxLength: 12,
+    maxLength: 14, // ✅ FIX: Aumentado para suportar 10 dígitos formatados (00.000.000-00)
     placeholder: '00.000.000-0',
     keyValidator: ValidationNumericKey,
-    pattern: '[0-9]{2}\\.[0-9]{3}\\.[0-9]{3}-[0-9]',
     inputMode: 'numeric'
   },
   telefone: {
@@ -141,13 +152,14 @@ export const INPUT_MASKS: Record<string, InputMask> = {
     keyValidator: ValidationNumericKey,
     inputMode: 'numeric'
   },
+  // ✅ FIX: periodicidade uses text input with numeric-only filtering
   periodicidade: {
     format: InputFormatPeriodicidade,
     maxLength: 3,
     placeholder: '30',
     keyValidator: ValidationNumericKey,
     pattern: '[0-9]{1,3}',
-    inputMode: 'numeric'
+    inputMode: 'numeric' // Shows numeric keyboard on mobile
   },
   email: {
     format: InputFormatEmail,
