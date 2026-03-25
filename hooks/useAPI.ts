@@ -27,7 +27,7 @@ import {
   ListarCustodiadosResponse,
   CustodiadoData,
 } from '@/types/api';
-import { StatusComparecimento } from '@/types/api copy';
+import { StatusComparecimento } from '@/types/api';
 // Hook para custodiados
 export function useCustodiados() {
   const [custodiados, setCustodiados] = useState<CustodiadoData[] | null>(null);
@@ -37,13 +37,13 @@ export function useCustodiados() {
   const fetchCustodiados = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      setError(null);  
-      
+      setError(null);
+
       console.log('[useCustodiados] Iniciando busca de custodiados...', { forceRefresh });
-      
+
       const response: ListarCustodiadosResponse = await custodiadosService.listar();
       console.log('[useCustodiados] Resposta recebida:', response);
-  
+
       if (response.success && Array.isArray(response.data)) {
         console.log('[useCustodiados] Custodiados carregados:', response.data.length);
         setCustodiados(response.data);

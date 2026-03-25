@@ -22,16 +22,11 @@ import {
 } from 'lucide-react';
 
 import { useCustodiados, useComparecimentos } from '@/hooks/useAPI';
-import { CustodiadoData, ComparecimentoDTO, TipoValidacao } from '@/types/api';
+import { CustodiadoData, TipoValidacao } from '@/types/api';
 import type { Processo } from '@/types/processo';
 import EnderecoForm from '@/components/EnderecoForm';
 import { useToastHelpers } from '@/components/Toast';
 import { calcularProximoComparecimento, formatarPeriodicidade } from '@/lib/utils/periodicidade';
-import {
-  sanitizeFormData,
-  validateBeforeSend,
-  logFormDataForDebug
-} from '@/lib/utils/enumValidation';
 
 import {
   FormularioComparecimento,
@@ -91,6 +86,66 @@ function SeletorProcesso({
       </div>
     </div>
   );
+}
+
+/**
+ * Extracts the custodiadoId (numericId) from a process API response,
+ * handling nested data structures.
+ */
+function extractCustodiadoIdFromProcesso(proc: any): number {
+  // Direct field
+  if (proc.custodiadoId && typeof proc.custodiadoId === 'number') {
+    return proc.custodiadoId;
+  }
+  // Nested in data
+  if (proc.data?.custodiadoId && typeof proc.data.custodiadoId === 'number') {
+    return proc.data.custodiadoId;
+  }
+  // Try parsing string
+  const parsed = parseInt(proc.custodiadoId || proc.data?.custodiadoId);
+  if (!isNaN(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return 0;
+}
+
+/**
+ * Build a minimal CustodiadoData from a Processo response.
+ * The process endpoint already returns custodiadoId, custodiadoNome, custodiadoCpf, etc.
+ * This avoids calling GET /custodiados/{id} which expects UUID, not numericId.
+ */
+function buildCustodiadoFromProcesso(proc: any): CustodiadoData {
+  const custodiadoId = extractCustodiadoIdFromProcesso(proc);
+
+  console.log('[buildCustodiadoFromProcesso] Extracting from process:', {
+    rawCustodiadoId: proc.custodiadoId,
+    extractedId: custodiadoId,
+    nome: proc.custodiadoNome,
+    cpf: proc.custodiadoCpf,
+  });
+
+  return {
+    id: custodiadoId,
+    nome: proc.custodiadoNome || '',
+    cpf: proc.custodiadoCpf || '',
+    rg: '',
+    contato: '',
+    processo: proc.numeroProcesso || '',
+    vara: proc.vara || '',
+    comarca: proc.comarca || '',
+    dataDecisao: proc.dataDecisao || '',
+    periodicidade: proc.periodicidade || 30,
+    status: proc.status,
+    ultimoComparecimento: proc.ultimoComparecimento || '',
+    proximoComparecimento: proc.proximoComparecimento || '',
+    cep: '',
+    logradouro: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    criadoEm: proc.criadoEm || '',
+    atualizadoEm: proc.atualizadoEm || null,
+  } as CustodiadoData;
 }
 
 function ConfirmarPresencaPage() {
@@ -178,6 +233,11 @@ function ConfirmarPresencaPage() {
     carregarUsuarioLogado();
   }, []);
 
+  // =====================================================================
+  // FIX: Load process by processoId WITHOUT fetching custodiado separately.
+  // GET /custodiados/{id} expects UUID (publicId), not numericId (Long).
+  // The process response already has custodiadoId, custodiadoNome, etc.
+  // =====================================================================
   useEffect(() => {
     if (!processoIdParam) return;
 
@@ -185,16 +245,52 @@ function ConfirmarPresencaPage() {
       try {
         setEstado('buscando');
         const response = await httpClient.get<any>(`/processos/${processoIdParam}`);
+
+        console.log('[ConfirmarPresenca] GET /processos response:', response);
+
         if (response.success && response.data) {
+          // Handle nested data: response.data.data or response.data
           const proc = response.data.data || response.data;
+
+          console.log('[ConfirmarPresenca] Processo extracted:', proc);
+
           setProcessoSelecionado(proc);
-          const custResp = await httpClient.get<any>(`/custodiados/${proc.custodiadoId}`);
-          if (custResp.success && custResp.data) {
-            setCustodiado(custResp.data.data || custResp.data);
+
+          // Build custodiado from process data (avoids 404 on /custodiados/{numericId})
+          const custodiadoFromProc = buildCustodiadoFromProcesso(proc);
+
+          // Try to enrich with full custodiado data (graceful fallback on 404)
+          const custodiadoNumericId = extractCustodiadoIdFromProcesso(proc);
+          if (custodiadoNumericId > 0) {
+            try {
+              const custResp = await httpClient.get<any>(`/custodiados/${custodiadoNumericId}`);
+              if (custResp.success && custResp.data) {
+                const fullCustodiado = custResp.data.data || custResp.data;
+                console.log('[ConfirmarPresenca] Full custodiado loaded:', fullCustodiado);
+                setCustodiado({
+                  ...custodiadoFromProc,
+                  ...fullCustodiado,
+                  // CRITICAL: keep numericId for the comparecimento API
+                  id: custodiadoNumericId,
+                });
+              } else {
+                console.log('[ConfirmarPresenca] Custodiado fetch failed, using process data');
+                setCustodiado(custodiadoFromProc);
+              }
+            } catch (custErr) {
+              // 404 is expected - /custodiados/{id} may expect UUID
+              console.warn('[ConfirmarPresenca] Could not fetch custodiado (expected if endpoint needs UUID):', custErr);
+              setCustodiado(custodiadoFromProc);
+            }
+          } else {
+            console.warn('[ConfirmarPresenca] No valid custodiadoId from process');
+            setCustodiado(custodiadoFromProc);
           }
+
           setExpandedSection('dados-pessoais');
         }
-      } catch {
+      } catch (err) {
+        console.error('[ConfirmarPresenca] Error loading process:', err);
         error('Erro', 'Não foi possível carregar o processo');
       } finally {
         setEstado('inicial');
@@ -210,23 +306,41 @@ function ConfirmarPresencaPage() {
     const carregarProcessosDoCustodiado = async () => {
       try {
         setEstado('buscando');
-        const [custResp, procResp] = await Promise.all([
-          httpClient.get<any>(`/custodiados/${custodiadoIdParam}`),
-          httpClient.get<any>(`/processos/custodiado/${custodiadoIdParam}`)
-        ]);
 
-        if (custResp.success) setCustodiado(custResp.data?.data || custResp.data);
+        const procResp = await httpClient.get<any>(`/processos/custodiado/${custodiadoIdParam}`);
 
         if (procResp.success) {
           const processos = procResp.data?.data || procResp.data || [];
           const ativos = processos.filter((p: any) => p.situacaoProcesso === 'ATIVO');
 
-          if (ativos.length === 1) {
-            setProcessoSelecionado(ativos[0]);
-            setExpandedSection('dados-pessoais');
-          } else if (ativos.length > 1) {
-            setProcessosDisponiveis(ativos);
-            setPrecisaSelecionarProcesso(true);
+          if (ativos.length >= 1) {
+            const custodiadoFromProc = buildCustodiadoFromProcesso(ativos[0]);
+            custodiadoFromProc.id = parseInt(custodiadoIdParam);
+
+            // Try to enrich
+            try {
+              const custResp = await httpClient.get<any>(`/custodiados/${custodiadoIdParam}`);
+              if (custResp.success && custResp.data) {
+                const fullCustodiado = custResp.data?.data || custResp.data;
+                setCustodiado({
+                  ...custodiadoFromProc,
+                  ...fullCustodiado,
+                  id: parseInt(custodiadoIdParam),
+                });
+              } else {
+                setCustodiado(custodiadoFromProc);
+              }
+            } catch {
+              setCustodiado(custodiadoFromProc);
+            }
+
+            if (ativos.length === 1) {
+              setProcessoSelecionado(ativos[0]);
+              setExpandedSection('dados-pessoais');
+            } else {
+              setProcessosDisponiveis(ativos);
+              setPrecisaSelecionarProcesso(true);
+            }
           }
         }
       } catch {
@@ -337,14 +451,30 @@ function ConfirmarPresencaPage() {
     return `${h}:${m}:00`;
   };
 
+  // =====================================================================
+  // FIX: Send processoId as PRIMARY identifier (preferred by backend).
+  // custodiadoId is sent as fallback only if available.
+  // The backend resolves: processoId → processo → custodiado automatically.
+  // =====================================================================
   const confirmarComparecimento = async () => {
     if (!custodiado) {
       error('Erro', 'Nenhuma pessoa selecionada');
       return;
     }
 
-    if (!custodiado.id || custodiado.id === 0) {
-      error('Erro', 'ID do custodiado inválido');
+    const processoId = processoSelecionado?.id;
+    const custodiadoNumericId = typeof custodiado.id === 'number' ? custodiado.id : parseInt(String(custodiado.id));
+
+    console.log('[ConfirmarPresenca] Confirming with:', {
+      processoId,
+      custodiadoId: custodiado.id,
+      custodiadoNumericId,
+      custodiadoNome: custodiado.nome,
+    });
+
+    // Require at least one identifier
+    if (!processoId && (!custodiadoNumericId || isNaN(custodiadoNumericId) || custodiadoNumericId <= 0)) {
+      error('Erro', 'Não foi possível identificar o processo ou custodiado');
       return;
     }
 
@@ -381,33 +511,58 @@ function ConfirmarPresencaPage() {
         return;
       }
 
-      const dadosComparecimento: ComparecimentoDTO = {
-        processoId: processoSelecionado?.id,
-        custodiadoId: custodiado.id,
+      // =====================================================================
+      // BUILD THE REQUEST BODY
+      // Backend ComparecimentoDTO accepts:
+      //   processoId (Long, preferred) OR custodiadoId (Long, fallback)
+      // When processoId is provided, backend extracts custodiado from the process.
+      // =====================================================================
+      const body: Record<string, any> = {
         dataComparecimento: formulario.dataComparecimento,
         horaComparecimento: horaFormatada,
         tipoValidacao: formulario.tipoValidacao,
         validadoPor: formulario.validadoPor.trim() || 'Sistema',
-        observacoes: formulario.observacoes?.trim() || undefined,
         mudancaEndereco: atualizacaoEndereco.houveAlteracao,
-        motivoMudancaEndereco: atualizacaoEndereco.motivoAlteracao,
-        novoEndereco: atualizacaoEndereco.houveAlteracao ? {
-          cep: atualizacaoEndereco.endereco!.cep,
-          logradouro: atualizacaoEndereco.endereco!.logradouro,
-          numero: atualizacaoEndereco.endereco!.numero,
-          complemento: atualizacaoEndereco.endereco!.complemento,
-          bairro: atualizacaoEndereco.endereco!.bairro,
-          cidade: atualizacaoEndereco.endereco!.cidade,
-          estado: atualizacaoEndereco.endereco!.estado,
-        } : undefined
       };
 
-      const dadosValidados = validateBeforeSend(dadosComparecimento);
-      const dadosLimpos = sanitizeFormData(dadosValidados);
+      // Add processoId if available (preferred path)
+      if (processoId) {
+        body.processoId = processoId;
+      }
 
-      logFormDataForDebug(dadosLimpos, 'Dados enviados para API');
+      // Add custodiadoId if available and valid
+      if (custodiadoNumericId && !isNaN(custodiadoNumericId) && custodiadoNumericId > 0) {
+        body.custodiadoId = custodiadoNumericId;
+      }
 
-      const result = await registrarComparecimento(dadosLimpos);
+      // Optional fields
+      if (formulario.observacoes?.trim()) {
+        body.observacoes = formulario.observacoes.trim();
+      }
+
+      if (atualizacaoEndereco.motivoAlteracao) {
+        body.motivoMudancaEndereco = atualizacaoEndereco.motivoAlteracao;
+      }
+
+      if (atualizacaoEndereco.houveAlteracao && atualizacaoEndereco.endereco) {
+        body.novoEndereco = {
+          cep: atualizacaoEndereco.endereco.cep,
+          logradouro: atualizacaoEndereco.endereco.logradouro,
+          numero: atualizacaoEndereco.endereco.numero,
+          complemento: atualizacaoEndereco.endereco.complemento,
+          bairro: atualizacaoEndereco.endereco.bairro,
+          cidade: atualizacaoEndereco.endereco.cidade,
+          estado: atualizacaoEndereco.endereco.estado,
+        };
+      }
+
+      console.log('[ConfirmarPresenca] Sending to API:', JSON.stringify(body, null, 2));
+
+      // Send directly via httpClient to /comparecimentos/registrar
+      // This bypasses the hook's validation that requires custodiadoId
+      const result = await httpClient.post<any>('/comparecimentos/registrar', body);
+
+      console.log('[ConfirmarPresenca] API response:', result);
 
       if (result.success) {
         setMensagem(`Comparecimento registrado com sucesso para ${custodiado.nome}`);
@@ -421,17 +576,23 @@ function ConfirmarPresencaPage() {
           // silently ignore refetch errors
         }
 
+        const redirectId = custodiadoNumericId || processoSelecionado?.custodiadoId;
         setTimeout(() => {
-          router.push(`/dashboard/custodiados/${custodiado.id}?refresh=true`);
+          if (redirectId && !isNaN(redirectId) && redirectId > 0) {
+            router.push(`/dashboard/custodiados/${redirectId}?refresh=true`);
+          } else {
+            router.push('/dashboard/geral');
+          }
         }, 1500);
       } else {
-        throw new Error(result.message || 'Erro ao registrar comparecimento');
+        throw new Error(result.message || result.error || 'Erro ao registrar comparecimento');
       }
 
     } catch (err) {
       setEstado('erro');
-      setMensagem(err instanceof Error ? err.message : 'Erro desconhecido ao confirmar comparecimento');
-      error('Erro', 'Não foi possível registrar o comparecimento');
+      const errMsg = err instanceof Error ? err.message : 'Erro desconhecido ao confirmar comparecimento';
+      setMensagem(errMsg);
+      error('Erro', errMsg);
     }
   };
 
@@ -646,7 +807,7 @@ function ConfirmarPresencaPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <p className="text-xs text-gray-500">CPF</p>
-                        <p className="font-medium text-gray-800">{custodiado.cpf}</p>
+                        <p className="font-medium text-gray-800">{custodiado.cpf || 'Não informado'}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">RG</p>
@@ -691,6 +852,9 @@ function ConfirmarPresencaPage() {
                             <p>{custodiado.endereco.cidade} - {custodiado.endereco.estado}</p>
                             <p>CEP: {custodiado.endereco.cep}</p>
                           </div>
+                        )}
+                        {!custodiado.endereco && (
+                          <p className="text-sm text-blue-600 italic">Nenhum endereço cadastrado</p>
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -900,7 +1064,7 @@ function ConfirmarPresencaPage() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 mb-1">CPF</p>
-                        <p className="font-semibold text-gray-800">{custodiado.cpf}</p>
+                        <p className="font-semibold text-gray-800">{custodiado.cpf || 'Não informado'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 mb-1">RG</p>
@@ -938,6 +1102,9 @@ function ConfirmarPresencaPage() {
                               <p className="text-gray-800">{custodiado.endereco.cidade} - {custodiado.endereco.estado}</p>
                               <p className="text-gray-600 text-sm mt-2">CEP: {custodiado.endereco.cep}</p>
                             </div>
+                          )}
+                          {!custodiado.endereco && (
+                            <p className="text-blue-600 italic mb-4">Nenhum endereço cadastrado para este custodiado.</p>
                           )}
                           <div className="flex gap-4">
                             <button

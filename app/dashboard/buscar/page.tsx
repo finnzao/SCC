@@ -7,50 +7,37 @@ import { useBuscaInteligente } from '@/hooks/useBuscaInteligente';
 import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 import type { ResultadoBusca } from '@/hooks/useBuscaInteligente';
 
+/**
+ * ID RULES:
+ * - For navigation to /custodiados/{id}: use UUID (custodiado.id)
+ * - For confirmar comparecimento: use processoId (Long)
+ *
+ * The search endpoint returns custodiadoId as numericId.
+ * We need to find the UUID for navigation. Since we may not have it from search results,
+ * we pass numericId to the detail page which will handle the lookup.
+ *
+ * NOTE: If the backend search returns a UUID field, use that instead.
+ */
+
 function HintBusca({ tipo, termo }: { tipo: string; termo: string }) {
   if (tipo === 'vazio') return null;
 
   if (tipo === 'nome' && termo.length < 3) {
     const restante = 3 - termo.length;
-    return (
-      <p className="text-sm text-gray-500 mt-2">
-        Digite mais {restante} letra{restante > 1 ? 's' : ''}
-      </p>
-    );
+    return (<p className="text-sm text-gray-500 mt-2">Digite mais {restante} letra{restante > 1 ? 's' : ''}</p>);
   }
 
   if (tipo === 'nome' && termo.length >= 3) {
-    return (
-      <p className="text-sm text-blue-600 mt-2">
-        Buscando por nome...
-      </p>
-    );
+    return (<p className="text-sm text-blue-600 mt-2">Buscando por nome...</p>);
   }
 
   if (tipo === 'incompleto') {
     const digitos = termo.replace(/\D/g, '').length;
-    return (
-      <p className="text-sm text-gray-500 mt-2">
-        CPF: {digitos}/11 dígitos | Processo: {digitos}/20 dígitos
-      </p>
-    );
+    return (<p className="text-sm text-gray-500 mt-2">CPF: {digitos}/11 dígitos | Processo: {digitos}/20 dígitos</p>);
   }
 
-  if (tipo === 'cpf') {
-    return (
-      <p className="text-sm text-green-600 mt-2">
-        CPF completo detectado
-      </p>
-    );
-  }
-
-  if (tipo === 'processo') {
-    return (
-      <p className="text-sm text-green-600 mt-2">
-        Número de processo completo detectado
-      </p>
-    );
-  }
+  if (tipo === 'cpf') return (<p className="text-sm text-green-600 mt-2">CPF completo detectado</p>);
+  if (tipo === 'processo') return (<p className="text-sm text-green-600 mt-2">Número de processo completo detectado</p>);
 
   return null;
 }
@@ -65,13 +52,19 @@ export default function BuscarPage() {
     tipoDetectado === 'cpf' ||
     tipoDetectado === 'processo';
 
+  // Navigate to custodiado detail
+  // The search results have custodiadoId (numericId) but we need UUID for /custodiados/{uuid}
+  // For now, pass the custodiadoId - the detail page will handle looking up via the list endpoint
+  const handleVerPerfil = (custodiadoId: number) => {
+    // TODO: If search results include custodiadoUuid, use that instead
+    router.push(`/dashboard/custodiados/${custodiadoId}`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white sticky top-0 z-20 shadow-sm">
         <div className="p-4 max-w-3xl mx-auto">
-          <h1 className="text-xl font-bold text-primary-dark mb-3">
-            Buscar Pessoa
-          </h1>
+          <h1 className="text-xl font-bold text-primary-dark mb-3">Buscar Pessoa</h1>
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -90,9 +83,7 @@ export default function BuscarPage() {
           <HintBusca tipo={tipoDetectado} termo={termoBusca} />
 
           {totalResultados > 0 && (
-            <p className="text-sm text-gray-600 mt-2">
-              {totalResultados} resultado{totalResultados !== 1 ? 's' : ''} encontrado{totalResultados !== 1 ? 's' : ''}
-            </p>
+            <p className="text-sm text-gray-600 mt-2">{totalResultados} resultado{totalResultados !== 1 ? 's' : ''} encontrado{totalResultados !== 1 ? 's' : ''}</p>
           )}
         </div>
       </div>
@@ -104,25 +95,14 @@ export default function BuscarPage() {
               <Search className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Busque por uma pessoa</h3>
-            <p className="text-gray-500 text-center text-sm px-8">
-              Digite o nome, CPF ou número do processo para encontrar rapidamente
-            </p>
+            <p className="text-gray-500 text-center text-sm px-8">Digite o nome, CPF ou número do processo</p>
 
             <div className="mt-8 w-full max-w-sm">
               <h4 className="text-sm font-medium text-gray-700 mb-3">Dicas de busca:</h4>
               <div className="space-y-2">
-                <div className="flex items-start gap-2 text-sm text-gray-600">
-                  <span className="text-primary">•</span>
-                  <span>Digite pelo menos 3 caracteres do nome</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-600">
-                  <span className="text-primary">•</span>
-                  <span>CPF com 11 dígitos busca automaticamente</span>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-600">
-                  <span className="text-primary">•</span>
-                  <span>Processo com 20 dígitos busca automaticamente</span>
-                </div>
+                <div className="flex items-start gap-2 text-sm text-gray-600"><span className="text-primary">•</span><span>Digite pelo menos 3 caracteres do nome</span></div>
+                <div className="flex items-start gap-2 text-sm text-gray-600"><span className="text-primary">•</span><span>CPF com 11 dígitos busca automaticamente</span></div>
+                <div className="flex items-start gap-2 text-sm text-gray-600"><span className="text-primary">•</span><span>Processo com 20 dígitos busca automaticamente</span></div>
               </div>
             </div>
           </div>
@@ -164,15 +144,8 @@ export default function BuscarPage() {
               <Search className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Nenhum resultado encontrado</h3>
-            <p className="text-gray-500 text-center text-sm px-8 mb-6">
-              Não encontramos ninguém com &quot;{termoBusca}&quot;
-            </p>
-            <button
-              onClick={() => { setTermoBusca(''); limpar(); }}
-              className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary-dark transition-colors"
-            >
-              Nova busca
-            </button>
+            <p className="text-gray-500 text-center text-sm px-8 mb-6">Não encontramos ninguém com &quot;{termoBusca}&quot;</p>
+            <button onClick={() => { setTermoBusca(''); limpar(); }} className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary-dark">Nova busca</button>
           </div>
         )}
 
@@ -192,7 +165,7 @@ export default function BuscarPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => router.push(`/dashboard/custodiados/${resultado.custodiadoId}`)}
+                      onClick={() => handleVerPerfil(resultado.custodiadoId)}
                       className="text-sm text-primary hover:text-primary-dark font-medium flex items-center gap-1"
                     >
                       Ver Perfil <ChevronRight className="w-4 h-4" />
@@ -239,18 +212,8 @@ export default function BuscarPage() {
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
         <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => router.push('/dashboard/geral')}
-            className="bg-gray-100 text-gray-700 py-3 rounded-lg font-medium text-sm hover:bg-gray-200 transition-colors"
-          >
-            Ver Lista Geral
-          </button>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="bg-primary text-white py-3 rounded-lg font-medium text-sm hover:bg-primary-dark transition-colors"
-          >
-            Voltar ao Início
-          </button>
+          <button onClick={() => router.push('/dashboard/geral')} className="bg-gray-100 text-gray-700 py-3 rounded-lg font-medium text-sm hover:bg-gray-200">Ver Lista Geral</button>
+          <button onClick={() => router.push('/dashboard')} className="bg-primary text-white py-3 rounded-lg font-medium text-sm hover:bg-primary-dark">Voltar ao Início</button>
         </div>
       </div>
     </div>

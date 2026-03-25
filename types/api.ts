@@ -104,6 +104,7 @@ export interface CustodiadoDTO {
 
 export interface CustodiadoData extends CustodiadoDTO {
   id?: number;
+  numericId: number;
   periodicidadeDescricao?: string;
   status?: StatusComparecimento;
   ultimoComparecimento?: string;
@@ -139,7 +140,7 @@ export interface CustodiadoListDTO {
 
 export interface ComparecimentoDTO {
   processoId?: number;
-  custodiadoId: number;
+  custodiadoId?: number;
   dataComparecimento: string;
   horaComparecimento?: string;
   tipoValidacao: TipoValidacao;

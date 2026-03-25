@@ -6,7 +6,6 @@ import { TipoValidacao } from '@/types/api';
  *  Converte enum do frontend para string MINÚSCULA aceita pelo backend
  */
 export function convertTipoValidacaoToString(tipo: TipoValidacao): string {
-  // Garantir que sempre enviamos string em minúsculas
   switch (tipo) {
     case TipoValidacao.PRESENCIAL:
       return 'presencial';
@@ -85,14 +84,21 @@ export function sanitizeFormData(data: any): any {
 }
 
 /**
- * Valida dados antes do envio
+ * Valida dados antes do envio.
+ * 
+ * FIX: The backend accepts EITHER processoId OR custodiadoId.
+ * processoId is preferred (Caminho A). custodiadoId is fallback (Caminho B).
+ * Only fail if NEITHER is provided.
  */
 export function validateBeforeSend(data: any): any {
   const errors: string[] = [];
 
-  // Validar campos obrigatórios
-  if (!data.custodiadoId) {
-    errors.push('ID do custodiado é obrigatório');
+  // Accept either processoId or custodiadoId
+  const hasProcessoId = data.processoId && data.processoId > 0;
+  const hasCustodiadoId = data.custodiadoId && data.custodiadoId > 0;
+
+  if (!hasProcessoId && !hasCustodiadoId) {
+    errors.push('É necessário informar o ID do processo ou do custodiado');
   }
 
   if (!data.dataComparecimento) {
@@ -156,7 +162,9 @@ export function logFormDataForDebug(data: any, label: string = 'FormData'): void
   if (process.env.NODE_ENV === 'development') {
     console.group(`[${label}] Dados do formulário:`);
     console.log(' Dados originais:', data);
-    console.log(' Tipo de tipoValidacao:', typeof data.tipoValidacao, data.tipoValidacao);
+    console.log(' processoId:', data.processoId);
+    console.log(' custodiadoId:', data.custodiadoId);
+    console.log(' tipoValidacao:', typeof data.tipoValidacao, data.tipoValidacao);
 
     if (data.novoEndereco) {
       console.log(' Endereço:', data.novoEndereco);
@@ -166,7 +174,6 @@ export function logFormDataForDebug(data: any, label: string = 'FormData'): void
     try {
       const sanitized = sanitizeFormData(data);
       console.log(' Dados sanitizados:', sanitized);
-      console.log(' tipoValidacao após sanitização:', sanitized.tipoValidacao);
 
       validateBeforeSend(sanitized);
       console.log(' Validação passou!');
