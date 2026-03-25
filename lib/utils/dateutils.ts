@@ -1,235 +1,217 @@
-// lib/utils/dateutils.ts - FIXED: null-safe date handling throughout
-
 /**
- * ✅ FIX: All functions now handle null/undefined gracefully
+ * Utilitário interno para validar Date
  */
-
-/**
- * Converte uma string de data (YYYY-MM-DD) para um objeto Date sem problemas de timezone
- */
-export function parseLocalDate(dateString: string | null | undefined): Date {
-  if (!dateString) return new Date();
-  
-  // Handle Date objects passed as any
-  if (dateString instanceof Date) return dateString;
-  
-  // Handle string dates
-  const str = String(dateString);
-  
-  // If it contains 'T', extract just the date part
-  const datePart = str.includes('T') ? str.split('T')[0] : str;
-  
-  const [year, month, day] = datePart.split('-').map(Number);
-  
-  // Validate parsed numbers
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return new Date();
-  
-  return new Date(year, month - 1, day);
+function isValidDate(date: unknown): date is Date {
+  return date instanceof Date && !isNaN(date.getTime());
 }
 
 /**
- * Formata um objeto Date para string no formato YYYY-MM-DD (data local)
+ * Converte string (YYYY-MM-DD ou ISO) ou Date para Date local seguro
  */
-export function formatToLocalDateString(date: Date | null | undefined): string {
-  if (!date || isNaN(date.getTime())) return '';
-  
+export function parseLocalDate(
+  input: string | Date | null | undefined
+): Date {
+  if (!input) return new Date();
+
+  if (isValidDate(input)) return input;
+
+  const str = String(input).trim();
+  if (!str || str === 'null' || str === 'undefined') return new Date();
+
+  const datePart = str.includes('T') ? str.split('T')[0] : str;
+  const parts = datePart.split('-').map(Number);
+
+  if (parts.length !== 3) return new Date();
+
+  const [year, month, day] = parts;
+
+  if (!year || !month || !day) return new Date();
+
+  const date = new Date(year, month - 1, day);
+
+  return isValidDate(date) ? date : new Date();
+}
+
+/**
+ * Formata Date para YYYY-MM-DD (input type="date")
+ */
+export function formatToLocalDateString(
+  date: Date | null | undefined
+): string {
+  if (!isValidDate(date)) return '';
+
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  
+
   return `${year}-${month}-${day}`;
 }
 
 /**
- * ✅ FIX: Formata uma string de data para formato brasileiro (DD/MM/YYYY)
- * Agora lida corretamente com null, undefined, Date objects e strings inválidas
+ * Formata para DD/MM/YYYY (Brasil)
  */
-export function formatToBrazilianDate(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '';
-  
-  // Handle Date objects
-  if (dateString instanceof Date) {
-    if (isNaN(dateString.getTime())) return '';
-    const day = String(dateString.getDate()).padStart(2, '0');
-    const month = String(dateString.getMonth() + 1).padStart(2, '0');
-    const year = dateString.getFullYear();
-    return `${day}/${month}/${year}`;
+export function formatToBrazilianDate(
+  input: string | Date | null | undefined
+): string {
+  if (!input) return '';
+
+  if (isValidDate(input)) {
+    const d = input;
+    return `${String(d.getDate()).padStart(2, '0')}/${String(
+      d.getMonth() + 1
+    ).padStart(2, '0')}/${d.getFullYear()}`;
   }
-  
-  // Handle string dates
-  const str = String(dateString);
-  if (!str || str === 'null' || str === 'undefined') return '';
-  
-  try {
-    const date = parseLocalDate(str);
-    if (isNaN(date.getTime())) return '';
-    
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    
-    return `${day}/${month}/${year}`;
-  } catch {
-    return '';
-  }
+
+  const date = parseLocalDate(input);
+
+  if (!isValidDate(date)) return '';
+
+  return `${String(date.getDate()).padStart(2, '0')}/${String(
+    date.getMonth() + 1
+  ).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
 /**
- * Formata uma data para exibição com dia da semana em português
+ * Formata com dia da semana
  */
-export function formatWithWeekday(dateString: string | null | undefined): string {
-  if (!dateString) return '';
-  
-  const date = parseLocalDate(dateString);
-  if (isNaN(date.getTime())) return '';
-  
-  const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  const weekday = weekdays[date.getDay()];
-  
-  return `${weekday}, ${formatToBrazilianDate(dateString)}`;
+export function formatWithWeekday(
+  input: string | Date | null | undefined
+): string {
+  const date = parseLocalDate(input);
+  if (!isValidDate(date)) return '';
+
+  const weekdays = [
+    'Domingo',
+    'Segunda',
+    'Terça',
+    'Quarta',
+    'Quinta',
+    'Sexta',
+    'Sábado',
+  ];
+
+  return `${weekdays[date.getDay()]}, ${formatToBrazilianDate(date)}`;
 }
 
 /**
- * Converte Date para o formato aceito pelo input type="date" (YYYY-MM-DD)
+ * Para input type="date"
  */
-export function toInputDateValue(date: Date | null | undefined): string {
-  if (!date || isNaN(date.getTime())) return '';
+export function toInputDateValue(
+  date: Date | null | undefined
+): string {
   return formatToLocalDateString(date);
 }
 
 /**
- * Obtém a data atual no formato YYYY-MM-DD
+ * Data atual YYYY-MM-DD
  */
 export function getTodayDateString(): string {
   return formatToLocalDateString(new Date());
 }
 
-// ========== FUNÇÕES PARA TIMESTAMPS ==========
+// ================= TIMESTAMP =================
 
-/**
- * ✅ FIX: Extrai apenas a data (YYYY-MM-DD) de um timestamp ISO 8601
- * Lida com null/undefined
- */
-export function extractDateFromTimestamp(timestamp: string | null | undefined): string {
+export function extractDateFromTimestamp(
+  timestamp: string | null | undefined
+): string {
   if (!timestamp) return '';
-  
-  const str = String(timestamp);
-  if (str === 'null' || str === 'undefined') return '';
-  
+
+  const str = String(timestamp).trim();
+  if (!str || str === 'null' || str === 'undefined') return '';
+
   const datePart = str.split('T')[0];
-  
-  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-    return datePart;
-  }
-  
-  return '';
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart : '';
 }
 
-/**
- * Converte timestamp ISO 8601 para formato brasileiro (DD/MM/YYYY)
- */
-export function formatTimestampToBrazilian(timestamp: string | null | undefined): string {
-  if (!timestamp) return '';
-  const dateOnly = extractDateFromTimestamp(timestamp);
-  return formatToBrazilianDate(dateOnly);
+export function formatTimestampToBrazilian(
+  timestamp: string | null | undefined
+): string {
+  return formatToBrazilianDate(extractDateFromTimestamp(timestamp));
 }
 
-/**
- * Converte timestamp ISO 8601 para formato brasileiro completo com hora
- */
-export function formatTimestampToBrazilianFull(timestamp: string | null | undefined): string {
-  if (!timestamp) return '';
-  
-  try {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return '';
-    
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
-    return `${day}/${month}/${year} às ${hours}:${minutes}`;
-  } catch {
-    return '';
-  }
-}
-
-/**
- * Converte timestamp ISO 8601 para objeto Date
- */
-export function parseTimestamp(timestamp: string | null | undefined): Date | null {
-  if (!timestamp) return null;
-  
-  try {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return null;
-    return date;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Formata timestamp para exibição relativa (há X horas/dias)
- */
-export function formatTimestampRelative(timestamp: string | null | undefined): string {
-  if (!timestamp) return '';
-  
+export function formatTimestampToBrazilianFull(
+  timestamp: string | null | undefined
+): string {
   const date = parseTimestamp(timestamp);
   if (!date) return '';
-  
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${day}/${month}/${year} às ${hours}:${minutes}`;
+}
+
+export function parseTimestamp(
+  timestamp: string | null | undefined
+): Date | null {
+  if (!timestamp) return null;
+
+  const date = new Date(timestamp);
+
+  return isValidDate(date) ? date : null;
+}
+
+export function formatTimestampRelative(
+  timestamp: string | null | undefined
+): string {
+  const date = parseTimestamp(timestamp);
+  if (!date) return '';
+
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffMinutes < 1) return 'agora mesmo';
-  if (diffMinutes < 60) return `há ${diffMinutes} ${diffMinutes === 1 ? 'minuto' : 'minutos'}`;
-  if (diffHours < 24) return `há ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`;
-  if (diffDays < 30) return `há ${diffDays} ${diffDays === 1 ? 'dia' : 'dias'}`;
+
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+
+  if (minutes < 1) return 'agora mesmo';
+  if (minutes < 60)
+    return `há ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
+  if (hours < 24)
+    return `há ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+  if (days < 30)
+    return `há ${days} ${days === 1 ? 'dia' : 'dias'}`;
+
   return formatTimestampToBrazilian(timestamp);
 }
 
-/**
- * Verifica se um timestamp é de hoje
- */
-export function isTimestampToday(timestamp: string | null | undefined): boolean {
-  if (!timestamp) return false;
-  
+export function isTimestampToday(
+  timestamp: string | null | undefined
+): boolean {
   const date = parseTimestamp(timestamp);
   if (!date) return false;
-  
+
   const today = new Date();
-  return date.getDate() === today.getDate() &&
-         date.getMonth() === today.getMonth() &&
-         date.getFullYear() === today.getFullYear();
+
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
 }
 
-/**
- * Extrai apenas a hora (HH:mm) de um timestamp
- */
-export function extractTimeFromTimestamp(timestamp: string | null | undefined): string {
-  if (!timestamp) return '';
-  
+export function extractTimeFromTimestamp(
+  timestamp: string | null | undefined
+): string {
   const date = parseTimestamp(timestamp);
   if (!date) return '';
-  
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  
-  return `${hours}:${minutes}`;
+
+  return `${String(date.getHours()).padStart(2, '0')}:${String(
+    date.getMinutes()
+  ).padStart(2, '0')}`;
 }
 
 /**
- * ✅ NEW: Safe date formatting that never returns "Invalid Date" or "NaN"
- * Used throughout the app where dates might be null
+ * Nunca retorna inválido
  */
-export function safeFormatDate(date: string | Date | null | undefined, fallback = ''): string {
-  if (!date) return fallback;
-  
-  const result = formatToBrazilianDate(date);
+export function safeFormatDate(
+  input: string | Date | null | undefined,
+  fallback = ''
+): string {
+  const result = formatToBrazilianDate(input);
   return result || fallback;
 }

@@ -26,7 +26,6 @@ const dateUtils = {
   formatToBR: (date: string | Date | null | undefined): string => {
     if (!date) return 'Não informado';
     
-    // Se for string, usa parseLocalDate para evitar problema de timezone
     const dateObj = typeof date === 'string' ? dateUtils.parseLocalDate(date) : date;
     
     const day = String(dateObj.getDate()).padStart(2, '0');
@@ -36,7 +35,6 @@ const dateUtils = {
     return `${day}/${month}/${year}`;
   },
 
-  // Retorna data atual no formato YYYY-MM-DD
   getCurrentDate: (): string => {
     const hoje = new Date();
     const year = hoje.getFullYear();
@@ -45,10 +43,9 @@ const dateUtils = {
     return `${year}-${month}-${day}`;
   },
 
-  // Calcula dias até uma data (usando timezone local corretamente)
   getDaysUntil: (dateString: string): number => {
     const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0); // Zera horas para comparação justa
+    hoje.setHours(0, 0, 0, 0);
     
     const targetDate = dateUtils.parseLocalDate(dateString);
     targetDate.setHours(0, 0, 0, 0);
@@ -57,12 +54,10 @@ const dateUtils = {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   },
 
-  // Verifica se a data é hoje
   isToday: (dateString: string): boolean => {
     return dateString === dateUtils.getCurrentDate();
   },
 
-  // Verifica se a data está atrasada
   isOverdue: (dateString: string): boolean => {
     return dateUtils.getDaysUntil(dateString) < 0;
   }
@@ -75,7 +70,6 @@ interface Props {
   onExcluir?: (id: string | number) => void;
 }
 
-// Type helper para status
 type StatusKey = keyof typeof STATUS_COLORS;
 
 const getStatusKey = (status: string | undefined): StatusKey => {
@@ -93,6 +87,11 @@ const getStatusKey = (status: string | undefined): StatusKey => {
   return 'inadimplente';
 };
 
+function resolveId(id: string | number | undefined): string | number {
+  if (id === undefined || id === null) return 0;
+  return id;
+}
+
 export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onExcluir }: Props) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -107,8 +106,8 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
       
       setLoadingDetails(true);
       try {
-        const custodiadoId = typeof dados.id === 'string' ? parseInt(dados.id) : dados.id;
-        const response = await custodiadosService.buscarPorId(custodiadoId);
+        const rawId = resolveId(dados.id as any);
+        const response = await custodiadosService.buscarPorId(rawId as any);
         
         if (response && response.data) {
           const custodiado = response.data;
@@ -118,8 +117,6 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
             endereco: custodiado.endereco || dados.endereco,
             status: custodiado.status || dados.status
           } as any);
-          
-          console.log('Dados completos carregados:', custodiado);
         }
       } catch (error) {
         console.error('Erro ao buscar dados completos:', error);
@@ -141,8 +138,8 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
   };
 
   const handleVerHistoricoEnderecos = () => {
-    const custodiadoId = typeof dadosCompletos.id === 'string' ? parseInt(dadosCompletos.id) : dadosCompletos.id;
-    router.push(`/dashboard/historicoComparecimento/enderecos/${custodiadoId}`);
+    const rawId = resolveId(dadosCompletos.id as any);
+    router.push(`/dashboard/historicoComparecimento/enderecos/${rawId}`);
   };
 
   const handleConfirmDelete = async () => {
@@ -150,21 +147,17 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
     setDeleteError(null);
 
     try {
-      const custodiadoId = typeof dadosCompletos.id === 'string' ? parseInt(dadosCompletos.id) : dadosCompletos.id;
+      const rawId = resolveId(dadosCompletos.id as any);
       
-      if (!custodiadoId || isNaN(custodiadoId)) {
+      if (!rawId) {
         throw new Error('ID do custodiado inválido');
       }
 
-      console.log('Excluindo custodiado:', custodiadoId);
-      
-      const resultado = await custodiadosService.excluir(custodiadoId);
+      const resultado = await custodiadosService.excluir(rawId as any);
       
       if (resultado.success) {
-        console.log('Exclusão bem-sucedida');
-        
         if (onExcluir) {
-          onExcluir(custodiadoId);
+          onExcluir(rawId);
         }
         
         setTimeout(() => {

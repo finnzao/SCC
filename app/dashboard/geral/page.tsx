@@ -27,7 +27,7 @@ import {
 import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 
 interface CustodiadoFormatado {
-  id: number;
+  id: string;
   nome: string;
   cpf: string;
   rg: string;
@@ -55,7 +55,7 @@ interface CustodiadoFormatado {
   atrasado?: boolean;
   diasAtraso?: number;
   comparecimentoHoje?: boolean;
-  urgente?: boolean; // ✅ Adicionado para usar o valor do backend
+  urgente?: boolean;
   enderecoCompleto?: string;
   cidadeEstado?: string;
 }
@@ -121,33 +121,25 @@ function GeralPage() {
 
     if (isApiResponse(custodiadosBackend)) {
       if (custodiadosBackend.success && Array.isArray(custodiadosBackend.data)) {
-        console.log('[GeralPage] Dados extraídos da ApiResponse:', custodiadosBackend.data.length);
         return custodiadosBackend.data;
       }
-      console.warn('[GeralPage] ApiResponse com success=false ou data inválido');
       return [];
     }
 
-
     if (Array.isArray(custodiadosBackend)) {
-      console.log('[GeralPage] Array direto detectado:', custodiadosBackend.length);
       return custodiadosBackend;
     }
 
-    // CASO 3: Objeto com array em alguma propriedade
     if (typeof custodiadosBackend === 'object') {
       const possibleKeys = ['data', 'custodiados', 'items', 'results', 'content'];
 
       for (const key of possibleKeys) {
         if (key in custodiadosBackend && Array.isArray((custodiadosBackend as any)[key])) {
-          const arrayData = (custodiadosBackend as any)[key];
-          console.log(`[GeralPage] Array encontrado em '${key}':`, arrayData.length);
-          return arrayData;
+          return (custodiadosBackend as any)[key];
         }
       }
     }
 
-    console.warn('[GeralPage] Estrutura não reconhecida');
     return [];
   }, [custodiadosBackend, loadingBackend]);
 
@@ -156,13 +148,9 @@ function GeralPage() {
       return [];
     }
 
-    console.log('[GeralPage] Transformando', dadosExtraidos.length, 'custodiados');
-
     const transformarCustodiado = (custodiado: CustodiadoData): CustodiadoFormatado => {
-      // Função auxiliar para garantir string
       const ensureString = (value: string | undefined | null): string => value || '';
 
-      // Função auxiliar para processar proximoComparecimento
       const processarProximoComparecimento = (valor: string | Date | undefined): string => {
         if (!valor) return '';
         if (typeof valor === 'string') return valor;
@@ -170,8 +158,13 @@ function GeralPage() {
         return '';
       };
 
+      // id vem como UUID string do backend (CustodiadoListDTO.id = publicId.toString())
+      // Garantir que seja sempre string
+      const rawId = (custodiado as any).id;
+      const id: string = rawId !== undefined && rawId !== null ? String(rawId) : '';
+
       return {
-        id: custodiado.id ?? 0,
+        id,
         nome: custodiado.nome,
         cpf: custodiado.cpf || '',
         rg: custodiado.rg || '',
@@ -186,7 +179,6 @@ function GeralPage() {
         dataComparecimentoInicial: ensureString(custodiado.dataComparecimentoInicial),
         ultimoComparecimento: ensureString(custodiado.ultimoComparecimento),
         proximoComparecimento: processarProximoComparecimento(custodiado.proximoComparecimento),
-        // ✅ CORREÇÃO: Usar o valor de urgente que vem do backend
         urgente: (custodiado as any).urgente || false,
         diasAtraso: (custodiado as any).diasAtraso || 0,
         comparecimentoHoje: (custodiado as any).comparecimentoHoje || false,
@@ -215,7 +207,6 @@ function GeralPage() {
 
 
 
-  // Aplicar filtros da URL
   useEffect(() => {
     const busca = searchParams.get('busca');
     const status = searchParams.get('status') as 'todos' | 'em conformidade' | 'inadimplente' | null;
@@ -231,7 +222,6 @@ function GeralPage() {
   }, [searchParams]);
 
 
-  // ✅ CORREÇÃO: useEffect consolidado para detectar atualização
   useEffect(() => {
     const updated = searchParams.get('updated');
     const needsRefetch = typeof window !== 'undefined'
@@ -239,9 +229,6 @@ function GeralPage() {
       : null;
 
     if (updated || needsRefetch === 'true') {
-      console.log('[GeralPage] ✅ Detectado atualização recente, forçando refetch dos dados');
-
-      // Mostrar feedback visual ao usuário
       showToast({
         type: 'success',
         title: 'Lista Atualizada',
@@ -249,26 +236,20 @@ function GeralPage() {
         duration: 3000
       });
 
-      // Forçar atualização dos dados
       refetchCustodiados();
 
-      // Limpar flags e parâmetros da URL
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('needsRefetch');
         sessionStorage.removeItem('lastUpdate');
 
-        // Limpar parâmetro da URL sem recarregar a página
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, '', cleanUrl);
       }
     }
-  }, [searchParams, showToast, refetchCustodiados]); // ✅ Adicionado refetchCustodiados
+  }, [searchParams, showToast, refetchCustodiados]);
 
-  // ✅ CORREÇÃO: useEffect para ouvir evento de comparecimento registrado
   useEffect(() => {
     const handleComparecimentoRegistrado = () => {
-      console.log('[GeralPage] 📢 Evento de comparecimento detectado');
-      console.log('[GeralPage] 🔄 Atualizando lista de custodiados...');
       refetchCustodiados();
     };
 
@@ -277,7 +258,7 @@ function GeralPage() {
     return () => {
       window.removeEventListener('comparecimento-registrado', handleComparecimentoRegistrado);
     };
-  }, [refetchCustodiados]); // ✅ Adicionado refetchCustodiados
+  }, [refetchCustodiados]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -577,7 +558,6 @@ function GeralPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
-                  placeholder="Data Inicial"
                 />
 
                 <input
@@ -585,7 +565,6 @@ function GeralPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   value={dataFim}
                   onChange={(e) => setDataFim(e.target.value)}
-                  placeholder="Data Final"
                 />
 
                 {hasActiveFilters && (
@@ -611,7 +590,6 @@ function GeralPage() {
               const hoje = isToday(item.proximoComparecimento);
               const atrasado = isOverdue(item.proximoComparecimento);
               const diasRestantes = getDaysUntil(item.proximoComparecimento);
-              // ✅ CORREÇÃO: Usar a propriedade urgente do backend
               const urgente = item.urgente || false;
 
               return (
@@ -870,7 +848,6 @@ function GeralPage() {
                     const hoje = item.comparecimentoHoje || isToday(item.proximoComparecimento);
                     const atrasado = item.atrasado || isOverdue(item.proximoComparecimento);
                     const diasRestantes = item.diasAtraso || getDaysUntil(item.proximoComparecimento);
-                    // ✅ CORREÇÃO: Usar a propriedade urgente do backend
                     const urgente = item.urgente || false;
 
                     return (

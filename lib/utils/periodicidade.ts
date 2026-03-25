@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// painel-web/lib/utils/periodicidade.ts
 
 import { Periodicidade } from '@/types';
 

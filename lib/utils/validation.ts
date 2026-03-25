@@ -1,5 +1,3 @@
-// lib/utils/validation.ts - FIXED: RG validation range and null date handling
-
 import { ComparecimentoFormData, FormValidation } from '@/types/comparecimento';
 
 export const ValidationEmailFormat = (email: string): boolean => {

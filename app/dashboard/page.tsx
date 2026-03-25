@@ -781,8 +781,9 @@ export default function DashboardPage() {
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-sm text-blue-600">Total de Comparecimentos</p>
                   <p className="text-3xl font-bold text-blue-800">{resumo.relatorioUltimosMeses.totalComparecimentos ?? 0}</p>
-                  <p className="text-xs text-blue-500 mt-1">Média: {resumo.relatorioUltimosMeses.mediaComparecimentosMensal ?? 0}/mês</p>
-                </div>
+                  <p className="text-xs text-blue-500 mt-1">
+                    Média: {(resumo.relatorioUltimosMeses.mediaComparecimentosMensal ?? 0).toFixed(1)}/mês
+                  </p>                </div>
 
                 <div className="bg-green-50 p-4 rounded-lg">
                   <p className="text-sm text-green-600">Comparecimentos Presenciais</p>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -22,6 +23,7 @@ import {
 
 import { useCustodiados, useComparecimentos } from '@/hooks/useAPI';
 import { CustodiadoData, ComparecimentoDTO, TipoValidacao } from '@/types/api';
+import type { Processo } from '@/types/processo';
 import EnderecoForm from '@/components/EnderecoForm';
 import { useToastHelpers } from '@/components/Toast';
 import { calcularProximoComparecimento, formatarPeriodicidade } from '@/lib/utils/periodicidade';
@@ -42,9 +44,7 @@ import {
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
 import { authService } from '@/lib/api/authService';
 import { normalizarDataParaEnvio } from '@/lib/utils/formatting';
-
-
-
+import { httpClient } from '@/lib/http/client';
 
 
 declare global {
@@ -62,11 +62,44 @@ interface MobileSectionProps {
   children: React.ReactNode;
 }
 
+function SeletorProcesso({
+  processos,
+  onSelecionar
+}: {
+  processos: Processo[];
+  onSelecionar: (p: Processo) => void;
+}) {
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+      <h3 className="font-semibold text-gray-800 mb-3">Selecione o processo:</h3>
+      <div className="space-y-2">
+        {processos.map(p => (
+          <button
+            key={p.id}
+            onClick={() => onSelecionar(p)}
+            className="w-full text-left p-3 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-all"
+          >
+            <p className="font-mono font-medium text-gray-800 text-sm">{p.numeroProcesso}</p>
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+              <span>{p.vara}</span>
+              <span className={p.status === 'EM_CONFORMIDADE' ? 'text-green-600' : 'text-red-600 font-medium'}>
+                {p.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : `Inadimplente${p.diasAtraso > 0 ? ` — ${p.diasAtraso} dias` : ''}`}
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ConfirmarPresencaPage() {
   const router = useRouter();
 
   const searchParams = useSearchParamsSafe();
   const processo = searchParams.get('processo');
+  const processoIdParam = searchParams.get('processoId');
+  const custodiadoIdParam = searchParams.get('custodiadoId');
 
   const { success, error } = useToastHelpers();
 
@@ -82,6 +115,10 @@ function ConfirmarPresencaPage() {
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
   const [nomeUsuarioLogado, setNomeUsuarioLogado] = useState<string>('');
+
+  const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
+  const [processosDisponiveis, setProcessosDisponiveis] = useState<Processo[]>([]);
+  const [precisaSelecionarProcesso, setPrecisaSelecionarProcesso] = useState(false);
 
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
     dataComparecimento: dateUtils.getCurrentDate(),
@@ -111,31 +148,25 @@ function ConfirmarPresencaPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // ✅ Carregar dados do usuário logado ao montar o componente
   useEffect(() => {
     const carregarUsuarioLogado = () => {
       try {
         const userData = authService.getUserData();
 
         if (userData && userData.nome) {
-          console.log('[ConfirmarPresenca] 👤 Usuário logado:', userData.nome);
           setNomeUsuarioLogado(userData.nome);
-
-          // Atualizar o formulário com o nome do usuário
           setFormulario(prev => ({
             ...prev,
             validadoPor: userData.nome
           }));
         } else {
-          console.warn('[ConfirmarPresenca] ⚠️ Usuário não encontrado, usando padrão');
           setNomeUsuarioLogado('Servidor Atual');
           setFormulario(prev => ({
             ...prev,
             validadoPor: 'Servidor Atual'
           }));
         }
-      } catch (err) {
-        console.error('[ConfirmarPresenca] ❌ Erro ao carregar usuário:', err);
+      } catch {
         setNomeUsuarioLogado('Servidor Atual');
         setFormulario(prev => ({
           ...prev,
@@ -145,7 +176,68 @@ function ConfirmarPresencaPage() {
     };
 
     carregarUsuarioLogado();
-  }, []); // Executa apenas uma vez ao montar
+  }, []);
+
+  useEffect(() => {
+    if (!processoIdParam) return;
+
+    const carregarProcesso = async () => {
+      try {
+        setEstado('buscando');
+        const response = await httpClient.get<any>(`/processos/${processoIdParam}`);
+        if (response.success && response.data) {
+          const proc = response.data.data || response.data;
+          setProcessoSelecionado(proc);
+          const custResp = await httpClient.get<any>(`/custodiados/${proc.custodiadoId}`);
+          if (custResp.success && custResp.data) {
+            setCustodiado(custResp.data.data || custResp.data);
+          }
+          setExpandedSection('dados-pessoais');
+        }
+      } catch {
+        error('Erro', 'Não foi possível carregar o processo');
+      } finally {
+        setEstado('inicial');
+      }
+    };
+
+    carregarProcesso();
+  }, [processoIdParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!custodiadoIdParam || processoIdParam) return;
+
+    const carregarProcessosDoCustodiado = async () => {
+      try {
+        setEstado('buscando');
+        const [custResp, procResp] = await Promise.all([
+          httpClient.get<any>(`/custodiados/${custodiadoIdParam}`),
+          httpClient.get<any>(`/processos/custodiado/${custodiadoIdParam}`)
+        ]);
+
+        if (custResp.success) setCustodiado(custResp.data?.data || custResp.data);
+
+        if (procResp.success) {
+          const processos = procResp.data?.data || procResp.data || [];
+          const ativos = processos.filter((p: any) => p.situacaoProcesso === 'ATIVO');
+
+          if (ativos.length === 1) {
+            setProcessoSelecionado(ativos[0]);
+            setExpandedSection('dados-pessoais');
+          } else if (ativos.length > 1) {
+            setProcessosDisponiveis(ativos);
+            setPrecisaSelecionarProcesso(true);
+          }
+        }
+      } catch {
+        error('Erro', 'Não foi possível carregar os dados');
+      } finally {
+        setEstado('inicial');
+      }
+    };
+
+    carregarProcessosDoCustodiado();
+  }, [custodiadoIdParam, processoIdParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const normalizarTexto = useCallback((texto: string): string => {
     return texto
@@ -196,8 +288,7 @@ function ConfirmarPresencaPage() {
         setMostrarResultados(false);
         error('Pessoa não encontrada', 'Nenhuma pessoa encontrada para o termo de busca informado');
       }
-    } catch (err) {
-      console.error('Erro ao buscar pessoa:', err);
+    } catch {
       setEstado('inicial');
       error('Erro na busca', 'Ocorreu um erro ao buscar a pessoa');
     }
@@ -263,11 +354,6 @@ function ConfirmarPresencaPage() {
     }
 
     if (atualizacaoEndereco.houveAlteracao) {
-      console.log('[ConfirmarPresenca] 🏠 Validando mudança de endereço:', {
-        endereco: atualizacaoEndereco.endereco,
-        motivo: atualizacaoEndereco.motivoAlteracao
-      });
-
       if (!atualizacaoEndereco.endereco?.cep ||
         !atualizacaoEndereco.endereco?.logradouro ||
         !atualizacaoEndereco.endereco?.bairro ||
@@ -281,28 +367,13 @@ function ConfirmarPresencaPage() {
         error('Motivo inválido', 'O motivo da alteração deve ter pelo menos 10 caracteres');
         return;
       }
-
-      console.log('[ConfirmarPresenca] ✅ Validação de mudança de endereço OK');
     }
 
     setEstado('buscando');
 
     try {
       const horaFormatada = formatarHoraParaAPI(formulario.horaComparecimento);
-
       const dataParaEnvio = normalizarDataParaEnvio(formulario.dataComparecimento);
-
-      console.log('[ConfirmarPresenca] 📅 Dados temporais sendo enviados:', {
-        dataOriginal: formulario.dataComparecimento,
-        dataProcessada: dataParaEnvio,
-        horaOriginal: formulario.horaComparecimento,
-        horaProcessada: horaFormatada,
-        validacao: {
-          dataFormatoCorreto: /^\d{4}-\d{2}-\d{2}$/.test(dataParaEnvio),
-          horaFormatoCorreto: /^\d{2}:\d{2}:\d{2}$/.test(horaFormatada),
-          temTimezone: dataParaEnvio.includes('T') || dataParaEnvio.includes('Z'),
-        }
-      });
 
       if (dataParaEnvio.includes('T') || dataParaEnvio.includes('Z')) {
         error('Erro de formato', 'Data inválida detectada');
@@ -310,12 +381,8 @@ function ConfirmarPresencaPage() {
         return;
       }
 
-      console.log('[ConfirmarPresenca] 📦 Construindo payload com:', {
-        mudancaEndereco: atualizacaoEndereco.houveAlteracao,
-        endereco: atualizacaoEndereco.endereco,
-        motivo: atualizacaoEndereco.motivoAlteracao
-      });
       const dadosComparecimento: ComparecimentoDTO = {
+        processoId: processoSelecionado?.id,
         custodiadoId: custodiado.id,
         dataComparecimento: formulario.dataComparecimento,
         horaComparecimento: horaFormatada,
@@ -332,11 +399,8 @@ function ConfirmarPresencaPage() {
           bairro: atualizacaoEndereco.endereco!.bairro,
           cidade: atualizacaoEndereco.endereco!.cidade,
           estado: atualizacaoEndereco.endereco!.estado,
-
         } : undefined
       };
-
-      console.log('[ConfirmarPresenca] 📤 Payload final:', JSON.stringify(dadosComparecimento, null, 2));
 
       const dadosValidados = validateBeforeSend(dadosComparecimento);
       const dadosLimpos = sanitizeFormData(dadosValidados);
@@ -352,35 +416,22 @@ function ConfirmarPresencaPage() {
         await new Promise(resolve => setTimeout(resolve, 500));
 
         try {
-          console.log('[ConfirmarPresenca] Iniciando refetch dos dados...');
           await refetch();
-          console.log('[ConfirmarPresenca] ✅ Dados atualizados com sucesso');
-        } catch (error) {
-          console.error('[ConfirmarPresenca] ❌ Erro ao atualizar dados:', error);
-        }
-
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('needsRefetch', 'true');
-          sessionStorage.setItem('lastUpdate', Date.now().toString());
-
-          window.dispatchEvent(new CustomEvent('comparecimento-registrado', {
-            detail: { custodiadoId: custodiado.id, timestamp: Date.now() }
-          }));
-
+        } catch {
+          // silently ignore refetch errors
         }
 
         setTimeout(() => {
-          window.location.href = '/dashboard/geral';
-        }, 2000);
+          router.push(`/dashboard/custodiados/${custodiado.id}?refresh=true`);
+        }, 1500);
       } else {
         throw new Error(result.message || 'Erro ao registrar comparecimento');
       }
 
     } catch (err) {
-      console.error('Erro ao confirmar comparecimento:', err);
       setEstado('erro');
       setMensagem(err instanceof Error ? err.message : 'Erro desconhecido ao confirmar comparecimento');
-      error('Err  o', 'Não foi possível registrar o comparecimento');
+      error('Erro', 'Não foi possível registrar o comparecimento');
     }
   };
 
@@ -392,11 +443,9 @@ function ConfirmarPresencaPage() {
   };
 
   const handleEnderecoChange = (novoEndereco: Partial<Endereco>) => {
-    console.log('[ConfirmarPresenca] 📝 Atualizando endereço:', novoEndereco);
-
     setAtualizacaoEndereco(prev => ({
       ...prev,
-      endereco: {  // ✅ CORRIGIDO: era 'novoEndereco'
+      endereco: {
         ...prev.endereco,
         ...novoEndereco
       } as Endereco
@@ -427,7 +476,7 @@ function ConfirmarPresencaPage() {
     </div>
   );
 
-  if (loadingCustodiados) {
+  if (loadingCustodiados && !processoIdParam && !custodiadoIdParam) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -438,7 +487,7 @@ function ConfirmarPresencaPage() {
     );
   }
 
-  if (errorCustodiados) {
+  if (errorCustodiados && !processoIdParam && !custodiadoIdParam) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
@@ -461,7 +510,6 @@ function ConfirmarPresencaPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto p-4 md:p-6">
-        {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 mb-6">
           <div className="flex items-center gap-3 mb-2">
             <button
@@ -479,7 +527,6 @@ function ConfirmarPresencaPage() {
           </p>
         </div>
 
-        {/* Estados de Feedback */}
         {estado === 'sucesso' && (
           <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-6 animate-in fade-in slide-in-from-top-4">
             <div className="flex items-start gap-4">
@@ -496,7 +543,7 @@ function ConfirmarPresencaPage() {
                     </p>
                   </div>
                 )}
-                <p className="text-sm text-green-600 mt-3">Redirecionando para o painel...</p>
+                <p className="text-sm text-green-600 mt-3">Redirecionando...</p>
               </div>
             </div>
           </div>
@@ -520,59 +567,69 @@ function ConfirmarPresencaPage() {
           </div>
         )}
 
-        {/* Mobile Layout */}
+        {precisaSelecionarProcesso && !processoSelecionado && (
+          <SeletorProcesso
+            processos={processosDisponiveis}
+            onSelecionar={(p) => {
+              setProcessoSelecionado(p);
+              setPrecisaSelecionarProcesso(false);
+              setExpandedSection('dados-pessoais');
+            }}
+          />
+        )}
+
         {isMobile && estado !== 'sucesso' && (
           <div className="space-y-3">
-            {/* Busca */}
-            <MobileSection
-              title="Buscar Pessoa"
-              icon={Search}
-              isExpanded={expandedSection === 'busca'}
-              onToggle={() => setExpandedSection(expandedSection === 'busca' ? null : 'busca')}
-            >
-              <div className="space-y-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={buscaProcesso}
-                    onChange={(e) => setBuscaProcesso(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()}
-                    placeholder="Nome, CPF ou processo..."
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm"
-                  />
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                </div>
-
-                <button
-                  onClick={buscarPessoa}
-                  disabled={estado === 'buscando'}
-                  className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
-                >
-                  {estado === 'buscando' ? 'Buscando...' : 'Buscar'}
-                </button>
-
-                {mostrarResultados && resultadosBusca.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    <p className="text-sm font-medium text-gray-700">
-                      {resultadosBusca.length} resultado(s) encontrado(s):
-                    </p>
-                    {resultadosBusca.map((pessoa, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => selecionarPessoa(pessoa)}
-                        className="w-full p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors text-left"
-                      >
-                        <p className="font-medium text-gray-800">{pessoa.nome}</p>
-                        <p className="text-sm text-gray-600">{pessoa.processo}</p>
-                        <p className="text-xs text-gray-500">CPF: {pessoa.cpf}</p>
-                      </button>
-                    ))}
+            {!processoIdParam && !custodiadoIdParam && (
+              <MobileSection
+                title="Buscar Pessoa"
+                icon={Search}
+                isExpanded={expandedSection === 'busca'}
+                onToggle={() => setExpandedSection(expandedSection === 'busca' ? null : 'busca')}
+              >
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={buscaProcesso}
+                      onChange={(e) => setBuscaProcesso(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()}
+                      placeholder="Nome, CPF ou processo..."
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm"
+                    />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   </div>
-                )}
-              </div>
-            </MobileSection>
 
-            {/* Dados Pessoais */}
+                  <button
+                    onClick={buscarPessoa}
+                    disabled={estado === 'buscando'}
+                    className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+                  >
+                    {estado === 'buscando' ? 'Buscando...' : 'Buscar'}
+                  </button>
+
+                  {mostrarResultados && resultadosBusca.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <p className="text-sm font-medium text-gray-700">
+                        {resultadosBusca.length} resultado(s) encontrado(s):
+                      </p>
+                      {resultadosBusca.map((pessoa, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => selecionarPessoa(pessoa)}
+                          className="w-full p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors text-left"
+                        >
+                          <p className="font-medium text-gray-800">{pessoa.nome}</p>
+                          <p className="text-sm text-gray-600">{pessoa.processo}</p>
+                          <p className="text-xs text-gray-500">CPF: {pessoa.cpf}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </MobileSection>
+            )}
+
             {custodiado && (
               <>
                 <MobileSection
@@ -596,18 +653,25 @@ function ConfirmarPresencaPage() {
                         <p className="font-medium text-gray-800">{custodiado.rg || 'Não informado'}</p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Processo</p>
-                      <p className="font-medium text-gray-800">{custodiado.processo}</p>
-                    </div>
+                    {processoSelecionado && (
+                      <div>
+                        <p className="text-xs text-gray-500">Processo</p>
+                        <p className="font-medium text-gray-800">{processoSelecionado.numeroProcesso}</p>
+                      </div>
+                    )}
+                    {!processoSelecionado && (
+                      <div>
+                        <p className="text-xs text-gray-500">Processo</p>
+                        <p className="font-medium text-gray-800">{custodiado.processo}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs text-gray-500">Periodicidade</p>
-                      <p className="font-medium text-gray-800">{formatarPeriodicidade(custodiado.periodicidade)}</p>
+                      <p className="font-medium text-gray-800">{formatarPeriodicidade(processoSelecionado?.periodicidade || custodiado.periodicidade)}</p>
                     </div>
                   </div>
                 </MobileSection>
 
-                {/* Endereço */}
                 <MobileSection
                   title="Verificação de Endereço"
                   icon={MapPin}
@@ -629,7 +693,6 @@ function ConfirmarPresencaPage() {
                           </div>
                         )}
                       </div>
-
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           onClick={() => {
@@ -645,15 +708,7 @@ function ConfirmarPresencaPage() {
                             setEnderecoRespondido(true);
                             setAtualizacaoEndereco({
                               houveAlteracao: true,
-                              endereco: custodiado.endereco || {
-                                cep: '',
-                                logradouro: '',
-                                numero: '',
-                                complemento: '',
-                                bairro: '',
-                                cidade: '',
-                                estado: ''
-                              }
+                              endereco: custodiado.endereco || { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' }
                             });
                           }}
                           className="bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium"
@@ -667,28 +722,19 @@ function ConfirmarPresencaPage() {
                       {atualizacaoEndereco.houveAlteracao ? (
                         <div>
                           <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
-                            <p className="text-orange-800 font-medium text-sm">
-                              ⚠️ Atualizando endereço
-                            </p>
+                            <p className="text-orange-800 font-medium text-sm">Atualizando endereço</p>
                           </div>
-
                           <EnderecoForm
                             endereco={atualizacaoEndereco.endereco!}
                             onEnderecoChange={handleEnderecoChange}
                           />
-
                           <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Motivo da alteração *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Motivo da alteração *</label>
                             <textarea
                               value={atualizacaoEndereco.motivoAlteracao || ''}
                               onChange={(e) => {
                                 const value = e.target.value;
-                                setAtualizacaoEndereco(prev => ({
-                                  ...prev,
-                                  motivoAlteracao: value
-                                }));
+                                setAtualizacaoEndereco(prev => ({ ...prev, motivoAlteracao: value }));
                               }}
                               rows={2}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
@@ -697,12 +743,8 @@ function ConfirmarPresencaPage() {
                               maxLength={500}
                             />
                           </div>
-
                           <button
-                            onClick={() => {
-                              setEnderecoRespondido(false);
-                              setAtualizacaoEndereco({ houveAlteracao: false });
-                            }}
+                            onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }}
                             className="text-orange-600 hover:text-orange-800 transition-colors underline text-sm mt-3"
                           >
                             Alterar resposta
@@ -712,15 +754,10 @@ function ConfirmarPresencaPage() {
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <CheckCircle className="w-5 h-5 text-green-600" />
-                            <p className="text-green-800 font-medium text-sm">
-                              Endereço confirmado
-                            </p>
+                            <p className="text-green-800 font-medium text-sm">Endereço confirmado</p>
                           </div>
                           <button
-                            onClick={() => {
-                              setEnderecoRespondido(false);
-                              setAtualizacaoEndereco({ houveAlteracao: false });
-                            }}
+                            onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }}
                             className="text-green-600 hover:text-green-800 text-sm underline"
                           >
                             Alterar resposta
@@ -731,7 +768,6 @@ function ConfirmarPresencaPage() {
                   )}
                 </MobileSection>
 
-                {/* Formulário de Comparecimento */}
                 <MobileSection
                   title="Dados do Comparecimento"
                   icon={FileText}
@@ -740,83 +776,39 @@ function ConfirmarPresencaPage() {
                 >
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tipo de Validação *
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Validação *</label>
                       <select
                         value={formulario.tipoValidacao}
                         onChange={(e) => handleInputChange('tipoValidacao', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        required
                       >
                         <option value={TipoValidacao.PRESENCIAL}>Presencial</option>
                         <option value={TipoValidacao.ONLINE}>Balcão Virtual</option>
                         <option value={TipoValidacao.CADASTRO_INICIAL}>Cadastro Inicial</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Validado por *
-                      </label>
-                      <input
-                        type="text"
-                        value={formulario.validadoPor}
-                        onChange={(e) => handleInputChange('validadoPor', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        placeholder="Nome do servidor"
-                        required
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Validado por *</label>
+                      <input type="text" value={formulario.validadoPor} onChange={(e) => handleInputChange('validadoPor', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Nome do servidor" />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Data *
-                      </label>
-                      <input
-                        type="date"
-                        value={formulario.dataComparecimento}
-                        onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        required
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Data *</label>
+                      <input type="date" value={formulario.dataComparecimento} onChange={(e) => handleInputChange('dataComparecimento', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Horário *
-                      </label>
-                      <input
-                        type="time"
-                        value={formulario.horaComparecimento}
-                        onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        required
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Horário *</label>
+                      <input type="time" value={formulario.horaComparecimento} onChange={(e) => handleInputChange('horaComparecimento', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Observações
-                      </label>
-                      <textarea
-                        value={formulario.observacoes}
-                        onChange={(e) => handleInputChange('observacoes', e.target.value)}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
-                        placeholder="Adicione observações..."
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+                      <textarea value={formulario.observacoes} onChange={(e) => handleInputChange('observacoes', e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" placeholder="Adicione observações..." />
                     </div>
                   </div>
                 </MobileSection>
 
-                {/* Botões de Ação Mobile */}
                 <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
                   <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => router.back()}
-                      className="bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-                    >
+                    <button onClick={() => router.back()} className="bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors">
                       Cancelar
                     </button>
                     <button
@@ -840,62 +832,59 @@ function ConfirmarPresencaPage() {
           </div>
         )}
 
-        {/* Desktop Layout */}
         {!isMobile && estado !== 'sucesso' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="space-y-8">
-              {/* Busca Desktop */}
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
-                  <Search className="w-5 h-5" />
-                  Buscar Pessoa
-                </h3>
-
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={buscaProcesso}
-                    onChange={(e) => setBuscaProcesso(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()}
-                    placeholder="Digite o nome, CPF ou número do processo..."
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                  <button
-                    onClick={buscarPessoa}
-                    disabled={estado === 'buscando'}
-                    className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
-                  >
+              {!processoIdParam && !custodiadoIdParam && (
+                <div className="space-y-4">
+                  <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2">
                     <Search className="w-5 h-5" />
-                    {estado === 'buscando' ? 'Buscando...' : 'Buscar'}
-                  </button>
-                </div>
-
-                {mostrarResultados && resultadosBusca.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-700">
-                      {resultadosBusca.length} resultado(s) encontrado(s):
-                    </p>
-                    <div className="grid gap-3">
-                      {resultadosBusca.map((pessoa, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => selecionarPessoa(pessoa)}
-                          className="p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-all text-left"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-gray-800 text-lg">{pessoa.nome}</p>
-                              <p className="text-gray-600">{pessoa.processo}</p>
-                              <p className="text-sm text-gray-500">CPF: {pessoa.cpf}</p>
-                            </div>
-                            <UserCheck className="w-6 h-6 text-primary" />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                    Buscar Pessoa
+                  </h3>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={buscaProcesso}
+                      onChange={(e) => setBuscaProcesso(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()}
+                      placeholder="Digite o nome, CPF ou número do processo..."
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                    <button
+                      onClick={buscarPessoa}
+                      disabled={estado === 'buscando'}
+                      className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
+                    >
+                      <Search className="w-5 h-5" />
+                      {estado === 'buscando' ? 'Buscando...' : 'Buscar'}
+                    </button>
                   </div>
-                )}
-              </div>
+
+                  {mostrarResultados && resultadosBusca.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">{resultadosBusca.length} resultado(s) encontrado(s):</p>
+                      <div className="grid gap-3">
+                        {resultadosBusca.map((pessoa, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => selecionarPessoa(pessoa)}
+                            className="p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-all text-left"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-gray-800 text-lg">{pessoa.nome}</p>
+                                <p className="text-gray-600">{pessoa.processo}</p>
+                                <p className="text-sm text-gray-500">CPF: {pessoa.cpf}</p>
+                              </div>
+                              <UserCheck className="w-6 h-6 text-primary" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {custodiado && (
                 <>
@@ -904,7 +893,6 @@ function ConfirmarPresencaPage() {
                       <User className="w-5 h-5" />
                       Dados da Pessoa Selecionada
                     </h3>
-
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50 p-6 rounded-lg">
                       <div>
                         <p className="text-sm text-gray-500 mb-1">Nome Completo</p>
@@ -920,15 +908,15 @@ function ConfirmarPresencaPage() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 mb-1">Processo</p>
-                        <p className="font-semibold text-gray-800">{custodiado.processo}</p>
+                        <p className="font-semibold text-gray-800">{processoSelecionado?.numeroProcesso || custodiado.processo}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 mb-1">Vara</p>
-                        <p className="font-semibold text-gray-800">{custodiado.vara}</p>
+                        <p className="font-semibold text-gray-800">{processoSelecionado?.vara || custodiado.vara}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 mb-1">Periodicidade</p>
-                        <p className="font-semibold text-gray-800">{formatarPeriodicidade(custodiado.periodicidade)}</p>
+                        <p className="font-semibold text-gray-800">{formatarPeriodicidade(processoSelecionado?.periodicidade || custodiado.periodicidade)}</p>
                       </div>
                     </div>
                   </div>
@@ -938,13 +926,10 @@ function ConfirmarPresencaPage() {
                       <MapPin className="w-5 h-5" />
                       Verificação de Endereço
                     </h3>
-
                     {!enderecoRespondido ? (
                       <div className="space-y-4">
                         <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
-                          <p className="text-blue-800 font-medium mb-4">
-                            O endereço cadastrado está correto?
-                          </p>
+                          <p className="text-blue-800 font-medium mb-4">O endereço cadastrado está correto?</p>
                           {custodiado.endereco && (
                             <div className="bg-white rounded-lg p-4 mb-4 border border-blue-100">
                               <p className="text-gray-800">{custodiado.endereco.logradouro}{custodiado.endereco.numero ? `, ${custodiado.endereco.numero}` : ''}</p>
@@ -954,13 +939,9 @@ function ConfirmarPresencaPage() {
                               <p className="text-gray-600 text-sm mt-2">CEP: {custodiado.endereco.cep}</p>
                             </div>
                           )}
-
                           <div className="flex gap-4">
                             <button
-                              onClick={() => {
-                                setEnderecoRespondido(true);
-                                setAtualizacaoEndereco({ houveAlteracao: false });
-                              }}
+                              onClick={() => { setEnderecoRespondido(true); setAtualizacaoEndereco({ houveAlteracao: false }); }}
                               className="flex-1 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center gap-2"
                             >
                               <CheckCircle className="w-5 h-5" />
@@ -969,20 +950,7 @@ function ConfirmarPresencaPage() {
                             <button
                               onClick={() => {
                                 setEnderecoRespondido(true);
-                                // ✅ CORRIGIDO: Inicializar com endereço VAZIO
-                                setAtualizacaoEndereco({
-                                  houveAlteracao: true,
-                                  endereco: {
-                                    cep: '',
-                                    logradouro: '',
-                                    numero: '',
-                                    complemento: '',
-                                    bairro: '',
-                                    cidade: '',
-                                    estado: ''
-                                  }
-                                });
-                                console.log('[ConfirmarPresenca] 🏠 Mudança de endereço iniciada - formulário vazio');
+                                setAtualizacaoEndereco({ houveAlteracao: true, endereco: { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' } });
                               }}
                               className="flex-1 bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium flex items-center justify-center gap-2"
                             >
@@ -998,44 +966,22 @@ function ConfirmarPresencaPage() {
                           <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
                             <div className="flex items-center gap-2 mb-4">
                               <AlertCircle className="w-5 h-5 text-orange-600" />
-                              <p className="text-orange-800 font-medium">
-                                Atualização de endereço necessária
-                              </p>
+                              <p className="text-orange-800 font-medium">Atualização de endereço necessária</p>
                             </div>
-
-                            <EnderecoForm
-                              endereco={atualizacaoEndereco.endereco!}
-                              onEnderecoChange={handleEnderecoChange}
-                            />
-
+                            <EnderecoForm endereco={atualizacaoEndereco.endereco!} onEnderecoChange={handleEnderecoChange} />
                             <div className="mt-4">
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Motivo da alteração *
-                              </label>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Motivo da alteração *</label>
                               <textarea
                                 value={atualizacaoEndereco.motivoAlteracao || ''}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setAtualizacaoEndereco(prev => ({
-                                    ...prev,
-                                    motivoAlteracao: value
-                                  }));
-                                }}
+                                onChange={(e) => { setAtualizacaoEndereco(prev => ({ ...prev, motivoAlteracao: e.target.value })); }}
                                 rows={2}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
-                                placeholder="Mínimo 10 caracteres. Ex: Mudança familiar, trabalho..."
+                                placeholder="Mínimo 10 caracteres."
                                 minLength={10}
                                 maxLength={500}
                               />
                             </div>
-
-                            <button
-                              onClick={() => {
-                                setEnderecoRespondido(false);
-                                setAtualizacaoEndereco({ houveAlteracao: false });
-                              }}
-                              className="text-orange-600 hover:text-orange-800 transition-colors underline mt-3"
-                            >
+                            <button onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }} className="text-orange-600 hover:text-orange-800 transition-colors underline mt-3">
                               Alterar resposta
                             </button>
                           </div>
@@ -1043,17 +989,9 @@ function ConfirmarPresencaPage() {
                           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                             <div className="flex items-center gap-2">
                               <CheckCircle className="w-5 h-5 text-green-600" />
-                              <p className="text-green-800 font-medium">
-                                Endereço confirmado como inalterado
-                              </p>
+                              <p className="text-green-800 font-medium">Endereço confirmado como inalterado</p>
                             </div>
-                            <button
-                              onClick={() => {
-                                setEnderecoRespondido(false);
-                                setAtualizacaoEndereco({ houveAlteracao: false });
-                              }}
-                              className="text-green-600 hover:text-green-800 text-sm mt-2 underline"
-                            >
+                            <button onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }} className="text-green-600 hover:text-green-800 text-sm mt-2 underline">
                               Alterar resposta
                             </button>
                           </div>
@@ -1067,96 +1005,47 @@ function ConfirmarPresencaPage() {
                       <FileText className="w-5 h-5" />
                       Registrar Comparecimento
                     </h3>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Tipo de Validação *
-                        </label>
-                        <select
-                          value={formulario.tipoValidacao}
-                          onChange={(e) => handleInputChange('tipoValidacao', e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                          required
-                        >
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Validação *</label>
+                        <select value={formulario.tipoValidacao} onChange={(e) => handleInputChange('tipoValidacao', e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
                           <option value={TipoValidacao.PRESENCIAL}>Presencial</option>
                           <option value={TipoValidacao.ONLINE}>Balcão Virtual</option>
                           <option value={TipoValidacao.CADASTRO_INICIAL}>Cadastro Inicial</option>
                         </select>
                       </div>
-
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Validado por *
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Validado por *</label>
                         <div className="relative">
                           <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                          <input
-                            type="text"
-                            value={formulario.validadoPor}
-                            readOnly
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
-                            placeholder="Nome do servidor responsável"
-                            title={`Usuário logado: ${nomeUsuarioLogado}`}
-                          />
+                          <input type="text" value={formulario.validadoPor} readOnly className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed" title={`Usuário logado: ${nomeUsuarioLogado}`} />
                         </div>
                       </div>
-
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Data do Comparecimento *
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Data do Comparecimento *</label>
                         <div className="relative">
                           <Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                          <input
-                            type="date"
-                            value={formulario.dataComparecimento}
-                            onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                            required
-                          />
+                          <input type="date" value={formulario.dataComparecimento} onChange={(e) => handleInputChange('dataComparecimento', e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
                         </div>
                       </div>
-
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Horário do Comparecimento *
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Horário do Comparecimento *</label>
                         <div className="relative">
                           <Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                          <input
-                            type="time"
-                            value={formulario.horaComparecimento}
-                            onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                            required
-                          />
+                          <input type="time" value={formulario.horaComparecimento} onChange={(e) => handleInputChange('horaComparecimento', e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
                         </div>
                       </div>
                     </div>
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Observações
-                      </label>
-                      <textarea
-                        value={formulario.observacoes}
-                        onChange={(e) => handleInputChange('observacoes', e.target.value)}
-                        rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                        placeholder="Adicione observações sobre o comparecimento (opcional)..."
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+                      <textarea value={formulario.observacoes} onChange={(e) => handleInputChange('observacoes', e.target.value)} rows={4} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none" placeholder="Adicione observações sobre o comparecimento (opcional)..." />
                     </div>
                   </div>
 
                   <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
-                    <button
-                      onClick={() => router.back()}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium"
-                    >
+                    <button onClick={() => router.back()} className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all font-medium">
                       Cancelar
                     </button>
-
                     <button
                       onClick={confirmarComparecimento}
                       disabled={loadingComparecimento || !enderecoRespondido}
@@ -1192,9 +1081,6 @@ function ConfirmarPresencaPage() {
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2">• Registre o horário exato do atendimento</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">• Adicione observações relevantes quando necessário</span>
                 </li>
               </ul>
               <ul className="space-y-2 text-blue-800">

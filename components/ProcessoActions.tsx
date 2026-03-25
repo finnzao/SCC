@@ -2,11 +2,11 @@
 'use client';
 
 import { useState } from 'react';
-import { XCircle, PauseCircle, PlayCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { XCircle, PauseCircle, PlayCircle } from 'lucide-react';
 import { useProcessos } from '@/hooks/useProcessos';
 import { useToast } from '@/components/Toast';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import type { Processo, SituacaoProcesso } from '@/types/processo';
+import type { Processo } from '@/types/processo';
 
 interface ProcessoActionsProps {
   processo: Processo;

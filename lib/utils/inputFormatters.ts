@@ -1,5 +1,3 @@
-// lib/utils/inputFormatters.ts - FIXED: periodicidade and RG formatting
-
 import { ValidationNumericKey, ValidationAlphabeticKey, ValidationPhoneKey } from './validation';
 
 export const InputFormatCPF = (value: string): string => {
@@ -11,10 +9,9 @@ export const InputFormatCPF = (value: string): string => {
   return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9)}`;
 };
 
-// ✅ FIX: RG agora aceita até 10 caracteres (8-9 dígitos + formatação)
 // RG tradicional tem 8 ou 9 dígitos incluindo dígito verificador
 export const InputFormatRG = (value: string): string => {
-  const numbers = value.replace(/\D/g, '').slice(0, 10); // ✅ Aumentado de 9 para 10
+  const numbers = value.replace(/\D/g, '').slice(0, 10); 
   
   if (numbers.length <= 2) return numbers;
   if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;

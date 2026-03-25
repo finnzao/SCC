@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiClient, ApiResponse } from '../http/client';
 import { httpClient } from '@/lib/http/client';
@@ -52,8 +53,6 @@ export function clearAuthHeaders() {
   console.log('[Services] Token de autenticação removido');
 }
 
-// Custodiados Service
-
 export const custodiadosService = {
   async listar(options?: {
     forceRefresh?: boolean;
@@ -81,7 +80,6 @@ export const custodiadosService = {
           const trimmedData = response.data.trim();
 
           if (trimmedData.length === 0) {
-            console.warn('[CustodiadosService] Resposta vazia do servidor');
             return {
               success: false,
               message: 'Servidor retornou resposta vazia',
@@ -90,9 +88,7 @@ export const custodiadosService = {
           }
 
           parsedData = JSON.parse(trimmedData);
-          console.log('[CustodiadosService] JSON parseado:', parsedData);
         } else if (response.data === null || response.data === undefined) {
-          console.warn('[CustodiadosService] Resposta nula do servidor');
           return {
             success: false,
             message: 'Servidor não retornou dados',
@@ -100,7 +96,6 @@ export const custodiadosService = {
           };
         } else {
           parsedData = response.data;
-          console.log('[CustodiadosService] Data já é objeto:', parsedData);
         }
       } catch (parseError) {
         console.error('[CustodiadosService] Erro no parse do JSON:', parseError);
@@ -118,29 +113,27 @@ export const custodiadosService = {
       };
 
       if (parsedData && parsedData.success && Array.isArray(parsedData.data)) {
-        console.log('[CustodiadosService] Estrutura correta encontrada:', parsedData.data.length);
         result = {
           success: true,
           message: parsedData.message || `${parsedData.data.length} custodiados carregados`,
           data: parsedData.data
         };
-      }
-      else if (Array.isArray(parsedData)) {
-        console.log('[CustodiadosService] Dados são array direto:', parsedData.length);
+      } else if (Array.isArray(parsedData)) {
         result = {
           success: true,
           message: `${parsedData.length} custodiados carregados`,
           data: parsedData
         };
-      }
-      else if (parsedData && typeof parsedData === 'object') {
-        for (const [key, value] of Object.entries(parsedData)) {
-          if (Array.isArray(value)) {
-            console.log('[CustodiadosService] Array encontrado em:', key, value.length);
+      } else if (parsedData && typeof parsedData === 'object') {
+        const possibleKeys = ['data', 'custodiados', 'items', 'results', 'content'];
+
+        for (const key of possibleKeys) {
+          if (key in parsedData && Array.isArray((parsedData as any)[key])) {
+            const arrayData = (parsedData as any)[key];
             result = {
               success: true,
-              message: `${value.length} custodiados carregados`,
-              data: value
+              message: `${arrayData.length} custodiados carregados`,
+              data: arrayData
             };
             break;
           }
@@ -149,21 +142,12 @@ export const custodiadosService = {
 
       if (result.success && result.data.length > 0) {
         requestCache.set(cacheKey, result, cacheTimeout);
-        console.log(`[CustodiadosService] ${result.data.length} custodiados cacheados`);
       }
 
       return result;
 
     } catch (error) {
       console.error('[CustodiadosService] Erro ao listar custodiados:', error);
-
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        return {
-          success: false,
-          message: 'Erro de conexão com o servidor',
-          data: []
-        };
-      }
 
       return {
         success: false,
@@ -173,10 +157,12 @@ export const custodiadosService = {
     }
   },
 
-  async buscarPorId(id: number, options?: {
+  async buscarPorId(id: string | number, options?: {
     forceRefresh?: boolean;
     cacheTimeout?: number;
   }): Promise<CustodiadoResponse | null> {
+    if (!id) return null;
+
     const cacheKey = `custodiados:id:${id}`;
     const cacheTimeout = options?.cacheTimeout || 2 * 60 * 1000;
 
@@ -214,7 +200,6 @@ export const custodiadosService = {
 
       if (response.success) {
         requestCache.clear('custodiados:list');
-        console.log('[CustodiadosService] Cache da lista invalidado após criação');
       }
 
       return response;
@@ -232,7 +217,7 @@ export const custodiadosService = {
   },
 
   async atualizar(
-    id: number,
+    id: string | number,
     data: Partial<CustodiadoDTO>
   ): Promise<ApiResponse<CustodiadoResponse>> {
     try {
@@ -243,7 +228,6 @@ export const custodiadosService = {
       if (response.success) {
         requestCache.clear('custodiados:list');
         requestCache.clear(`custodiados:id:${id}`);
-        console.log('[CustodiadosService] Caches invalidados após atualização');
       }
 
       return response;
@@ -260,7 +244,7 @@ export const custodiadosService = {
     }
   },
 
-  async excluir(id: number): Promise<ApiResponse<void>> {
+  async excluir(id: string | number): Promise<ApiResponse<void>> {
     try {
       console.log(`[CustodiadosService] Excluindo custodiado ID: ${id}`);
 
@@ -269,7 +253,6 @@ export const custodiadosService = {
       if (response.success) {
         requestCache.clear('custodiados:list');
         requestCache.clear(`custodiados:id:${id}`);
-        console.log('[CustodiadosService] Caches invalidados após exclusão');
       }
 
       return response;
@@ -295,14 +278,11 @@ export const custodiadosService = {
     if (!options?.forceRefresh) {
       const cached = requestCache.get<CustodiadoResponse>(cacheKey);
       if (cached) {
-        console.log(`[CustodiadosService] Retornando processo ${processo} do cache`);
         return cached;
       }
     }
 
     try {
-      console.log(`[CustodiadosService] Buscando por processo: ${processo}`);
-
       const response = await apiClient.get<CustodiadoResponse>(
         `/custodiados/processo/${encodeURIComponent(processo)}`
       );
@@ -331,14 +311,11 @@ export const custodiadosService = {
     if (!options?.forceRefresh) {
       const cached = requestCache.get<CustodiadoResponse[]>(cacheKey);
       if (cached) {
-        console.log(`[CustodiadosService] Retornando status ${status} do cache`);
         return cached;
       }
     }
 
     try {
-      console.log(`[CustodiadosService] Buscando por status: ${status}`);
-
       const response = await apiClient.get<CustodiadoResponse[]>(
         `/custodiados/status/${status}`
       );
@@ -367,14 +344,11 @@ export const custodiadosService = {
     if (!options?.forceRefresh) {
       const cached = requestCache.get<CustodiadoResponse[]>(cacheKey);
       if (cached) {
-        console.log('[CustodiadosService] Retornando inadimplentes do cache');
         return cached;
       }
     }
 
     try {
-      console.log('[CustodiadosService] Buscando inadimplentes');
-
       const response = await apiClient.get<CustodiadoResponse[]>(
         '/custodiados/inadimplentes'
       );
@@ -393,8 +367,6 @@ export const custodiadosService = {
 
   async buscar(params: BuscarParams): Promise<CustodiadoResponse[]> {
     try {
-      console.log('[CustodiadosService] Fazendo busca com parâmetros:', params);
-
       const response = await apiClient.get<CustodiadoResponse[]>(
         '/custodiados/buscar',
         params
@@ -409,18 +381,14 @@ export const custodiadosService = {
   },
 
   invalidarCache(): void {
-    console.log('[CustodiadosService] Invalidando todo o cache de custodiados');
     requestCache.clear('custodiados:list');
     requestCache.clear('custodiados:inadimplentes');
   },
 
   async precarregar(): Promise<void> {
-    console.log('[CustodiadosService] Pré-carregando dados...');
-
     try {
       await this.listar();
       await this.buscarInadimplentes();
-      console.log('[CustodiadosService] Pré-carregamento concluído');
     } catch (error) {
       console.error('[CustodiadosService] Erro no pré-carregamento:', error);
     }
@@ -437,19 +405,13 @@ export const custodiadosService = {
   }
 };
 
-// Comparecimentos Service
-
 export const comparecimentosService = {
   async registrar(data: ComparecimentoDTO): Promise<ApiResponse<ComparecimentoResponse>> {
     try {
-      console.log('[ComparecimentosService] Registrando comparecimento:', data);
-
       const response = await httpClient.post<ComparecimentoResponse>(
         ENDPOINTS.REGISTRAR,
         data
       );
-
-      console.log('[ComparecimentosService] Resposta do registro:', response);
 
       return {
         success: response.success,
@@ -459,7 +421,6 @@ export const comparecimentosService = {
         timestamp: response.timestamp || new Date().toISOString()
       };
     } catch (error: any) {
-      console.error('[ComparecimentosService] Erro ao registrar:', error);
       return {
         success: false,
         message: error.message || 'Erro ao registrar comparecimento',
@@ -471,8 +432,6 @@ export const comparecimentosService = {
 
   async buscarPorCustodiado(custodiadoId: number): Promise<ComparecimentoResponse[]> {
     try {
-      console.log('[ComparecimentosService] Buscando comparecimentos do custodiado:', custodiadoId);
-
       const response = await httpClient.get<ComparecimentoResponse[]>(
         ENDPOINTS.CUSTODIADO(custodiadoId)
       );
@@ -486,7 +445,6 @@ export const comparecimentosService = {
         }
       }
 
-      console.warn('[ComparecimentosService] Resposta inesperada:', response);
       return [];
     } catch (error: any) {
       console.error('[ComparecimentosService] Erro ao buscar por custodiado:', error);
@@ -496,17 +454,13 @@ export const comparecimentosService = {
 
   async buscarPorPeriodo(params: PeriodoParams): Promise<ComparecimentoResponse[]> {
     try {
-      console.log('[ComparecimentosService] Buscando por período:', params);
-
       const response = await httpClient.get<ComparecimentoResponse[]>(
         ENDPOINTS.PERIODO,
         params
       );
 
       if (response.success && response.data) {
-        if (Array.isArray(response.data)) {
-          return response.data;
-        }
+        if (Array.isArray(response.data)) return response.data;
         if ((response.data as any).data && Array.isArray((response.data as any).data)) {
           return (response.data as any).data;
         }
@@ -514,21 +468,16 @@ export const comparecimentosService = {
 
       return [];
     } catch (error: any) {
-      console.error('[ComparecimentosService] Erro ao buscar por período:', error);
       return [];
     }
   },
 
   async comparecimentosHoje(): Promise<ComparecimentoResponse[]> {
     try {
-      console.log('[ComparecimentosService] Buscando comparecimentos de hoje');
-
       const response = await httpClient.get<ComparecimentoResponse[]>(ENDPOINTS.HOJE);
 
       if (response.success && response.data) {
-        if (Array.isArray(response.data)) {
-          return response.data;
-        }
+        if (Array.isArray(response.data)) return response.data;
         if ((response.data as any).data && Array.isArray((response.data as any).data)) {
           return (response.data as any).data;
         }
@@ -536,15 +485,12 @@ export const comparecimentosService = {
 
       return [];
     } catch (error: any) {
-      console.error('[ComparecimentosService] Erro ao buscar comparecimentos de hoje:', error);
       return [];
     }
   },
 
   async obterEstatisticas(params?: PeriodoParams): Promise<EstatisticasComparecimentoResponse> {
     try {
-      console.log('[ComparecimentosService] Obtendo estatísticas:', params);
-
       const response = await httpClient.get<EstatisticasComparecimentoResponse>(
         ENDPOINTS.ESTATISTICAS,
         params
@@ -561,13 +507,9 @@ export const comparecimentosService = {
         cadastrosIniciais: 0,
         mudancasEndereco: 0,
         mediaDiasEntreMudancas: 0,
-        periodo: params ? {
-          dataInicio: params.dataInicio,
-          dataFim: params.dataFim
-        } : undefined
+        periodo: params ? { dataInicio: params.dataInicio, dataFim: params.dataFim } : undefined
       };
     } catch (error: any) {
-      console.error('[ComparecimentosService] Erro ao obter estatísticas:', error);
       return {
         totalComparecimentos: 0,
         comparecimentosPresenciais: 0,
@@ -581,34 +523,25 @@ export const comparecimentosService = {
 
   async obterResumoSistema(): Promise<ResumoSistemaResponse> {
     try {
-      console.log('[ComparecimentosService] Obtendo resumo do sistema');
-
       const response = await httpClient.get<any>('/comparecimentos/resumo/sistema');
-
-      console.log('[ComparecimentosService] Resposta recebida:', response);
 
       if (response.success && response.data) {
         if (response.data.data && typeof response.data.data === 'object') {
-          console.log('[ComparecimentosService] Retornando response.data.data');
           return response.data.data as ResumoSistemaResponse;
         }
 
         if (response.data.totalCustodiados !== undefined) {
-          console.log('[ComparecimentosService] Retornando response.data diretamente');
           return response.data as ResumoSistemaResponse;
         }
 
         if (typeof response.data === 'object' && response.data !== null) {
           const possibleData = response.data.data || response.data;
           if (possibleData && possibleData.totalCustodiados !== undefined) {
-            console.log('[ComparecimentosService] Retornando dados aninhados');
             return possibleData as ResumoSistemaResponse;
           }
         }
       }
 
-
-      console.warn('[ComparecimentosService] Dados não encontrados na resposta, retornando estrutura padrão');
       return {
         totalCustodiados: 0,
         custodiadosEmConformidade: 0,
@@ -620,8 +553,6 @@ export const comparecimentosService = {
         ultimaAtualizacao: new Date().toISOString()
       };
     } catch (error: any) {
-      console.error('[ComparecimentosService] Erro ao obter resumo:', error);
-
       return {
         totalCustodiados: 0,
         custodiadosEmConformidade: 0,
@@ -637,23 +568,15 @@ export const comparecimentosService = {
 
   async listarTodos(params?: ListarComparecimentosParams): Promise<ApiResponse<any>> {
     try {
-      console.log('[ComparecimentosService] Listando todos os comparecimentos:', params);
-
       const queryParams = {
         page: params?.page ?? 0,
         size: params?.size ?? 50
       };
 
-      const response = await httpClient.get<any>(
-        ENDPOINTS.TODOS,
-        queryParams
-      );
-
-      console.log('[ComparecimentosService] Resposta de listarTodos:', response);
+      const response = await httpClient.get<any>(ENDPOINTS.TODOS, queryParams);
 
       if (response.success && response.data) {
         if (response.data.comparecimentos && Array.isArray(response.data.comparecimentos)) {
-          console.log('[ComparecimentosService] Estrutura paginada detectada');
           return {
             success: true,
             message: response.message || 'Comparecimentos listados com sucesso',
@@ -672,7 +595,6 @@ export const comparecimentosService = {
         }
 
         if (Array.isArray(response.data)) {
-          console.log('[ComparecimentosService] Array direto detectado');
           return {
             success: true,
             message: 'Comparecimentos listados com sucesso',
@@ -691,7 +613,6 @@ export const comparecimentosService = {
         }
 
         if (response.data.data && response.data.data.comparecimentos) {
-          console.log('[ComparecimentosService] Estrutura aninhada detectada');
           const nested = response.data.data;
           return {
             success: true,
@@ -711,7 +632,6 @@ export const comparecimentosService = {
         }
       }
 
-      console.warn('[ComparecimentosService] Estrutura de resposta não reconhecida');
       return {
         success: false,
         message: response.message || 'Erro ao listar comparecimentos',
@@ -719,7 +639,6 @@ export const comparecimentosService = {
         timestamp: new Date().toISOString()
       };
     } catch (error: any) {
-      console.error('[ComparecimentosService] Erro ao listar todos:', error);
       return {
         success: false,
         message: error.message || 'Erro ao listar comparecimentos',
@@ -737,14 +656,7 @@ export const comparecimentosService = {
     size?: number;
   }): Promise<ApiResponse<ListarComparecimentosResponse>> {
     try {
-      console.log('[ComparecimentosService] Filtrando comparecimentos:', params);
-
-      const response = await httpClient.get<any>(
-        ENDPOINTS.FILTRAR,
-        params
-      );
-
-      console.log('[ComparecimentosService] Resposta de filtrar:', response);
+      const response = await httpClient.get<any>(ENDPOINTS.FILTRAR, params);
 
       if (response.success && response.data) {
         if (response.data.comparecimentos) {
@@ -783,7 +695,6 @@ export const comparecimentosService = {
         timestamp: new Date().toISOString()
       };
     } catch (error: any) {
-      console.error('[ComparecimentosService] Erro ao filtrar:', error);
       return {
         success: false,
         message: error.message || 'Erro ao filtrar comparecimentos',
@@ -794,55 +705,26 @@ export const comparecimentosService = {
   }
 };
 
-// Usuários Service
-
 export const usuariosService = {
   async listar(): Promise<UsuarioResponse[]> {
-    console.log('[UsuariosService] Listando usuários');
     const response = await apiClient.get<UsuarioResponse[]>('/usuarios');
     return response.success ? response.data || [] : [];
   },
 
   async criar(data: UsuarioDTO): Promise<ApiResponse<UsuarioResponse>> {
-    console.log('[UsuariosService] Criando usuário:', data);
     return await apiClient.post<UsuarioResponse>('/usuarios', data);
   },
 
   async atualizar(id: number, data: Partial<UsuarioDTO>): Promise<ApiResponse<UsuarioResponse>> {
-    console.log(`[UsuariosService] Atualizando usuário ID: ${id}`);
-    console.log('[UsuariosService] Dados recebidos:', data);
-    
     const dadosLimpos: Record<string, any> = {};
     
     Object.entries(data).forEach(([key, value]) => {
-
       if (value !== undefined && value !== null) {
         dadosLimpos[key] = value;
       }
     });
     
-    console.log('[UsuariosService] Dados limpos a serem enviados:', dadosLimpos);
-    
-    try {
-      const response = await apiClient.put<UsuarioResponse>(
-        `/usuarios/${id}`, 
-        dadosLimpos
-      );
-      
-      console.log('[UsuariosService] Resposta da API:', response);
-      
-      return response;
-    } catch (error: any) {
-      console.error('[UsuariosService] Erro ao atualizar:', error);
-      
-      if (error.response) {
-        console.error('[UsuariosService] Status:', error.response.status);
-        console.error('[UsuariosService] Data:', error.response.data);
-        console.error('[UsuariosService] Headers:', error.response.headers);
-      }
-      
-      throw error;
-    }
+    return await apiClient.put<UsuarioResponse>(`/usuarios/${id}`, dadosLimpos);
   }
 };
 
@@ -926,10 +808,8 @@ export interface ConviteResponse {
   telefone?: string;
 }
 
-
-
 export interface AtivarContaDTO {
-  nome?:string;
+  nome?: string;
   token: string;
   senha: string;
   confirmaSenha: string;
@@ -943,16 +823,12 @@ export interface ReenviarConviteDTO {
 
 export const convitesService = {
   async criarConvite(data: ConviteDTO): Promise<ApiResponse<ConviteResponse>> {
-    console.log('[ConvitesService] Criando convite para:', data.email);
-    
     try {
       const response = await apiClient.post<ConviteResponse>(
         '/usuarios/convites', 
         data,
         { timeout: 10000 }
       );
-      
-      console.log('[ConvitesService] Resposta recebida:', response);
       
       if (response.success || response.status === 201) {
         return {
@@ -966,8 +842,6 @@ export const convitesService = {
       return response;
       
     } catch (error: any) {
-      console.error('[ConvitesService] Erro ao criar convite:', error);
-      
       if (error.name === 'AbortError') {
         return {
           success: true,
@@ -987,13 +861,11 @@ export const convitesService = {
   },
 
   async listarConvites(status?: string): Promise<ApiResponse<ConviteResponse[]>> {
-    console.log('[ConvitesService] Listando convites', status ? `com status: ${status}` : '');
     const params = status ? { status } : undefined;
     return await apiClient.get<ConviteResponse[]>('/usuarios/convites', params);
   },
 
   async validarToken(token: string): Promise<ApiResponse<ValidarConviteResponse>> {
-    console.log('[ConvitesService] Validando token de convite');
     return await apiClient.get<ValidarConviteResponse>(`/usuarios/convites/validar/${token}`);
   },
 
@@ -1003,17 +875,14 @@ export const convitesService = {
     nome: string;
     tipo: string;
   }>> {
-    console.log('[ConvitesService] Ativando conta');
     return await apiClient.post('/usuarios/convites/ativar', data);
   },
 
   async reenviarConvite(id: number, data: ReenviarConviteDTO): Promise<ApiResponse<ConviteResponse>> {
-    console.log('[ConvitesService] Reenviando convite:', id);
     return await apiClient.post<ConviteResponse>(`/usuarios/convites/${id}/reenviar`, data);
   },
 
   async cancelarConvite(id: number, motivo?: string): Promise<ApiResponse<void>> {
-    console.log('[ConvitesService] Cancelando convite:', id);
     if (motivo) {
       return await apiClient.post<void>(`/usuarios/convites/${id}/cancelar`, { motivo });
     }
@@ -1023,12 +892,9 @@ export const convitesService = {
 
 export const authService = {
   async login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    console.log('[AuthService] Realizando login para:', data.email);
     try {
-      const response = await apiClient.post<LoginResponse>('/auth/login', data);
-      return response;
+      return await apiClient.post<LoginResponse>('/auth/login', data);
     } catch (error: any) {
-      console.error('[AuthService] Erro no login:', error);
       if (error.response?.status === 401) {
         return {
           success: false,
@@ -1042,23 +908,17 @@ export const authService = {
   },
 
   async logout(data?: LogoutRequest): Promise<ApiResponse<void>> {
-    console.log('[AuthService] Realizando logout');
     try {
-      const response = await apiClient.post<void>('/auth/logout', data || {});
-      return response;
+      return await apiClient.post<void>('/auth/logout', data || {});
     } catch (error: any) {
-      console.error('[AuthService] Erro no logout:', error);
       return { success: true, status: 200 };
     }
   },
 
   async refreshToken(data: RefreshTokenRequest): Promise<ApiResponse<LoginResponse>> {
-    console.log('[AuthService] Renovando token');
     try {
-      const response = await apiClient.post<LoginResponse>('/auth/refresh', data);
-      return response;
+      return await apiClient.post<LoginResponse>('/auth/refresh', data);
     } catch (error: any) {
-      console.error('[AuthService] Erro ao renovar token:', error);
       return {
         success: false,
         status: error.response?.status || 500,
@@ -1075,18 +935,15 @@ export const authService = {
     authorities?: string[];
     message?: string;
   }>> {
-    console.log('[AuthService] Validando token');
     try {
-      const response = await apiClient.get<{
+      return await apiClient.get<{
         valid: boolean;
         email?: string;
         expiration?: string;
         authorities?: string[];
         message?: string;
       }>('/auth/validate');
-      return response;
     } catch (error: any) {
-      console.error('[AuthService] Erro ao validar token:', error);
       return {
         success: false,
         status: error.response?.status || 401,
@@ -1096,12 +953,9 @@ export const authService = {
   },
 
   async alterarSenha(data: AlterarSenhaRequest): Promise<ApiResponse<void>> {
-    console.log('[AuthService] Alterando senha');
     try {
-      const response = await apiClient.post<void>('/auth/change-password', data);
-      return response;
+      return await apiClient.post<void>('/auth/change-password', data);
     } catch (error: any) {
-      console.error('[AuthService] Erro ao alterar senha:', error);
       return {
         success: false,
         status: error.response?.status || 500,
@@ -1111,39 +965,7 @@ export const authService = {
     }
   },
 
-  async solicitarResetSenha(data: ResetSenhaRequest): Promise<ApiResponse<void>> {
-    console.log('[AuthService] Solicitando reset de senha para:', data.email);
-    try {
-      const response = await apiClient.post<void>('/auth/forgot-password', data);
-      return response;
-    } catch (error: any) {
-      console.error('[AuthService] Erro ao solicitar reset:', error);
-      return {
-        success: true,
-        status: 200,
-        message: 'Se o email estiver cadastrado, você receberá instruções para recuperação'
-      };
-    }
-  },
-
-  async confirmarResetSenha(data: ConfirmarResetRequest): Promise<ApiResponse<void>> {
-    console.log('[AuthService] Confirmando reset de senha');
-    try {
-      const response = await apiClient.post<void>('/auth/reset-password', data);
-      return response;
-    } catch (error: any) {
-      console.error('[AuthService] Erro ao confirmar reset:', error);
-      return {
-        success: false,
-        status: error.response?.status || 400,
-        message: error.response?.data?.message || 'Token inválido ou expirado',
-        error: error.response?.data
-      };
-    }
-  },
-
   async getProfile(): Promise<ApiResponse<UsuarioResponse>> {
-    console.log('[AuthService] Obtendo perfil do usuário');
     try {
       const response = await apiClient.get<any>('/auth/me');
 
@@ -1157,7 +979,6 @@ export const authService = {
 
       return response;
     } catch (error: any) {
-      console.error('[AuthService] Erro ao obter perfil:', error);
       return {
         success: false,
         status: error.response?.status || 500,
@@ -1165,100 +986,15 @@ export const authService = {
         error: error.response?.data
       };
     }
-  },
-
-  async getSessionInfo(): Promise<ApiResponse<{
-    sessionId: string;
-    userEmail: string;
-    ipAddress: string;
-    userAgent: string;
-    loginTime: string;
-    lastActivity: string;
-    expiresAt: string;
-  }>> {
-    console.log('[AuthService] Obtendo informações da sessão');
-    try {
-      const response = await apiClient.get<{
-        sessionId: string;
-        userEmail: string;
-        ipAddress: string;
-        userAgent: string;
-        loginTime: string;
-        lastActivity: string;
-        expiresAt: string;
-      }>('/auth/session');
-      return response;
-    } catch (error: any) {
-      console.error('[AuthService] Erro ao obter sessão:', error);
-      return {
-        success: false,
-        status: error.response?.status || 500,
-        message: error.response?.data?.message || 'Erro ao obter sessão'
-      };
-    }
-  },
-
-  async getUserSessions(): Promise<ApiResponse<any[]>> {
-    console.log('[AuthService] Listando sessões do usuário');
-    try {
-      const response = await apiClient.get<any[]>('/auth/sessions');
-      return response;
-    } catch (error: any) {
-      console.error('[AuthService] Erro ao listar sessões:', error);
-      return {
-        success: false,
-        status: error.response?.status || 500,
-        message: error.response?.data?.message || 'Erro ao listar sessões',
-        data: []
-      };
-    }
-  },
-
-  async invalidateSession(sessionId: string): Promise<ApiResponse<void>> {
-    console.log('[AuthService] Invalidando sessão:', sessionId);
-    try {
-      const response = await apiClient.delete<void>(`/auth/sessions/${sessionId}`);
-      return response;
-    } catch (error: any) {
-      console.error('[AuthService] Erro ao invalidar sessão:', error);
-      return {
-        success: false,
-        status: error.response?.status || 500,
-        message: error.response?.data?.message || 'Erro ao invalidar sessão'
-      };
-    }
-  },
-
-  async checkSetup(): Promise<ApiResponse<{
-    setupRequired: boolean;
-    message: string;
-  }>> {
-    console.log('[AuthService] Verificando setup');
-    try {
-      const response = await apiClient.get<{
-        setupRequired: boolean;
-        message: string;
-      }>('/auth/check-setup');
-      return response;
-    } catch (error: any) {
-      console.error('[AuthService] Erro ao verificar setup:', error);
-      return {
-        success: false,
-        status: error.response?.status || 500,
-        data: { setupRequired: false, message: 'Erro ao verificar setup' }
-      };
-    }
   }
 };
 
 export const statusService = {
   async verificarInadimplentes(): Promise<ApiResponse<StatusVerificacaoResponse>> {
-    console.log('[StatusService] Verificando inadimplentes');
     return await apiClient.post<StatusVerificacaoResponse>('/status/verificar-inadimplentes');
   },
 
   async obterEstatisticas(): Promise<StatusEstatisticasResponse | null> {
-    console.log('[StatusService] Obtendo estatísticas');
     const response = await apiClient.get<StatusEstatisticasResponse>('/status/estatisticas');
     return response.success ? response.data || null : null;
   }
@@ -1266,7 +1002,6 @@ export const statusService = {
 
 export const setupService = {
   async getStatus(): Promise<SetupStatusResponse> {
-    console.log('[SetupService] Verificando status do setup');
     const response = await apiClient.get<SetupStatusResponse>(
       '/setup/status',
       undefined,
@@ -1282,7 +1017,6 @@ export const setupService = {
   },
 
   async createAdmin(data: SetupAdminDTO): Promise<ApiResponse<any>> {
-    console.log('[SetupService] Criando administrador inicial');
     return await apiClient.post('/setup/admin', data, {
       requireAuth: false
     });
@@ -1291,8 +1025,6 @@ export const setupService = {
 
 export const testService = {
   async health(): Promise<HealthResponse> {
-    console.log('[TestService] Verificando health');
-
     try {
       const response = await apiClient.get<any>(
         '/custodiados',
@@ -1337,8 +1069,6 @@ export const testService = {
   },
 
   async info(): Promise<AppInfoResponse> {
-    console.log('[TestService] Obtendo health da aplicação');
-
     try {
       const response = await apiClient.get<AppInfoResponse>(
         '/setup/health',
@@ -1350,7 +1080,7 @@ export const testService = {
         return response.data;
       }
     } catch (error) {
-      console.log(`[TestService] Actuator/info não disponível, tentando status/info${error}`);
+      console.log(`[TestService] Actuator/info não disponível${error}`);
     }
 
     try {

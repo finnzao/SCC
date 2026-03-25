@@ -138,6 +138,7 @@ export interface CustodiadoListDTO {
 }
 
 export interface ComparecimentoDTO {
+  processoId?: number;
   custodiadoId: number;
   dataComparecimento: string;
   horaComparecimento?: string;
@@ -876,7 +877,7 @@ export interface StatusEstatisticasResponse {
   percentualConformidade: number;
 }
 
-// Interfaces mantidas do frontend 
+// Interfaces mantidas do frontend
 export interface ListarCustodiadosResponse {
   success: boolean;
   message: string;
@@ -919,3 +920,9 @@ export type ConfirmarResetRequest = PasswordResetConfirmDTO;
 export type CustodiadoResponse = ApiResponse<CustodiadoData>;
 export type EstatisticasComparecimentoResponse = EstatisticasComparecimento;
 export type ResumoSistemaResponse = ResumoSistema;
+
+import type { Processo } from './processo';
+
+export interface CustodiadoComProcessos extends CustodiadoData {
+  processos: Processo[];
+}

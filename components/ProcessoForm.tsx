@@ -1,8 +1,8 @@
 // components/ProcessoForm.tsx - F5: Formulário de novo processo
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { X, FileText, Save, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { X, FileText, Save, Loader2, AlertCircle} from 'lucide-react';
 import { useProcessos } from '@/hooks/useProcessos';
 import { useToast } from '@/components/Toast';
 import type { ProcessoDTO } from '@/types/processo';

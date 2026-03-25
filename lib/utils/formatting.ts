@@ -1,5 +1,3 @@
-// lib/utils/formatting.ts - FIXED: RG formatting and null date handling
-
 export const FormattingEmailClean = (email: string): string => {
   if (!email) return '';
   let formatted = email.trim().toLowerCase().replace(/\s+/g, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '');

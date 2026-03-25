@@ -1,4 +1,3 @@
-// 📁 lib/jwt.ts
 import crypto from 'crypto';
 
 export interface JwtPayload {

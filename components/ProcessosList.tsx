@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/ProcessosList.tsx - F4: Lista de processos de um custodiado
 'use client';
 
