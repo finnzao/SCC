@@ -27,14 +27,10 @@ import {
 } from 'lucide-react';
 import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 
-/**
- * ID RULES:
- * - id: UUID string → navigation routes, GET /api/custodiados/{uuid}
- * - numericId: Long → sub-resources, POST body custodiadoId
- */
+
 interface CustodiadoFormatado {
-  id: string;         // UUID — for navigation & GET /custodiados/{id}
-  numericId: number;  // Long — for sub-resources & POST body
+  id: string;
+  numericId: number;
   nome: string;
   cpf: string;
   rg: string;
@@ -192,9 +188,7 @@ function GeralPage() {
     return dadosExtraidos.map(transformarCustodiado);
   }, [dadosExtraidos]);
 
-  // Navigate to detail page using UUID
   const handleVerDetalhes = (item: CustodiadoFormatado) => {
-    // Use UUID (item.id) for the route — this is what GET /api/custodiados/{id} expects
     router.push(`/dashboard/custodiados/${item.id}`);
   };
 
@@ -262,14 +256,14 @@ function GeralPage() {
   };
   const isOverdue = (ds: string): boolean => {
     if (!ds) return false;
-    const h = new Date(); h.setHours(0,0,0,0);
-    const d = new Date(ds); d.setHours(0,0,0,0);
+    const h = new Date(); h.setHours(0, 0, 0, 0);
+    const d = new Date(ds); d.setHours(0, 0, 0, 0);
     return d < h;
   };
   const getDaysUntil = (ds: string): number => {
     if (!ds) return 0;
-    const h = new Date(); h.setHours(0,0,0,0);
-    const d = new Date(ds); d.setHours(0,0,0,0);
+    const h = new Date(); h.setHours(0, 0, 0, 0);
+    const d = new Date(ds); d.setHours(0, 0, 0, 0);
     return Math.ceil((d.getTime() - h.getTime()) / 86400000);
   };
 
@@ -493,7 +487,7 @@ function GeralPage() {
                     <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="flex items-center gap-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"><ChevronLeft className="w-4 h-4" />Anterior</button>
                     <div className="flex gap-1">
                       {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        let pn; if (totalPages <= 5) pn = i+1; else if (currentPage <= 3) pn = i+1; else if (currentPage >= totalPages-2) pn = totalPages-4+i; else pn = currentPage-2+i;
+                        let pn; if (totalPages <= 5) pn = i + 1; else if (currentPage <= 3) pn = i + 1; else if (currentPage >= totalPages - 2) pn = totalPages - 4 + i; else pn = currentPage - 2 + i;
                         return <button key={pn} onClick={() => handlePageChange(pn)} className={`px-3 py-2 text-sm rounded-lg ${currentPage === pn ? 'bg-primary text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}>{pn}</button>;
                       })}
                     </div>

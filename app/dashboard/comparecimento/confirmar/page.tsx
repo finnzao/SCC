@@ -194,7 +194,7 @@ function ConfirmarPresencaPage() {
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
     dataComparecimento: dateUtils.getCurrentDate(),
     horaComparecimento: dateUtils.getCurrentTime(),
-    tipoValidacao: TipoValidacao.PRESENCIAL,
+    tipoValidacao: TipoValidacao.PRESENCIAL, // Now correctly 'presencial' (lowercase)
     observacoes: '',
     validadoPor: ''
   });
@@ -295,6 +295,31 @@ function ConfirmarPresencaPage() {
       try {
         setEstado('buscando');
         const numId = parseInt(custodiadoIdParam);
+        
+        if (isNaN(numId) || numId <= 0) {
+          // custodiadoIdParam might be a UUID - try to resolve via custodiados list
+          if (custodiados && custodiados.length > 0) {
+            const match = custodiados.find((c: any) => String(c.id) === custodiadoIdParam);
+            if (match) {
+              const resolvedNumId = (match as any).numericId || match.id;
+              const resolvedNum = typeof resolvedNumId === 'number' ? resolvedNumId : parseInt(String(resolvedNumId));
+              if (!isNaN(resolvedNum) && resolvedNum > 0) {
+                const ativos = await carregarProcessosAtivos(resolvedNum);
+                if (ativos.length >= 1) {
+                  const fromProc = buildCustodiadoFromProcesso(ativos[0]);
+                  fromProc.id = resolvedNum;
+                  (fromProc as any).numericId = resolvedNum;
+                  const enriched = enrichWithListData(fromProc, custodiados, resolvedNum);
+                  setCustodiado(enriched);
+                  definirProcessos(ativos);
+                  setExpandedSection(ativos.length === 1 ? 'dados-pessoais' : 'busca');
+                }
+              }
+            }
+          }
+          return;
+        }
+
         const ativos = await carregarProcessosAtivos(numId);
         if (ativos.length >= 1) {
           const fromProc = buildCustodiadoFromProcesso(ativos[0]);
@@ -414,11 +439,18 @@ function ConfirmarPresencaPage() {
       const data = normalizarDataParaEnvio(formulario.dataComparecimento);
       if (data.includes('T') || data.includes('Z')) { error('Erro de formato', 'Data inválida'); setEstado('inicial'); setLoadingComparecimento(false); return; }
 
+      /**
+       * CRITICAL FIX: tipoValidacao must be sent in lowercase.
+       * The TipoValidacao enum now has lowercase values ('presencial', 'online', 'cadastro_inicial')
+       * but we ensure it here as well for safety.
+       */
+      const tipoValidacaoValue = String(formulario.tipoValidacao).toLowerCase();
+
       const body: Record<string, any> = {
-        processoId: processoSelecionado.id,
+        processoId: processoSelecionado.id, // Long ID from processo
         dataComparecimento: data,
         horaComparecimento: formatarHora(formulario.horaComparecimento),
-        tipoValidacao: formulario.tipoValidacao,
+        tipoValidacao: tipoValidacaoValue, // Always lowercase
         validadoPor: formulario.validadoPor.trim() || 'Sistema',
         mudancaEndereco: atualizacaoEndereco.houveAlteracao,
       };
@@ -438,6 +470,8 @@ function ConfirmarPresencaPage() {
           estado: atualizacaoEndereco.endereco.estado,
         };
       }
+
+      console.log('[ConfirmarPresenca] Enviando body:', JSON.stringify(body, null, 2));
 
       const result = await httpClient.post<any>('/comparecimentos/registrar', body);
       if (result.success) {

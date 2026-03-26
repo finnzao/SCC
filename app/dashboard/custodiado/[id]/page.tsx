@@ -120,11 +120,13 @@ export default function CustodiadoDetailPage() {
   useEffect(() => { carregarDados(); }, [carregarDados]);
 
   // ── Carregar histórico quando tab mudar ────────────────────
+  // CRITICAL FIX: Use numericId (Long) for comparecimentos endpoint
 
   const carregarHistorico = useCallback(async () => {
     if (historicoCarregado || loadingHistorico) return;
     setLoadingHistorico(true);
     try {
+      // custodiadoId here is already parsed as int from URL params, which is the numericId
       const data = await comparecimentosService.buscarPorCustodiado(custodiadoId);
       const arr = Array.isArray(data) ? data : (data as any)?.data || [];
       // Ordenar por data mais recente primeiro
@@ -149,7 +151,8 @@ export default function CustodiadoDetailPage() {
   // ── Handlers de ação ───────────────────────────────────────
 
   const handleConfirmarPresenca = () => {
-    if (custodiado) router.push(`/dashboard/comparecimento/confirmar?processo=${encodeURIComponent(custodiado.processo)}`);
+    // Use numericId for the confirmar page
+    if (custodiado) router.push(`/dashboard/comparecimento/confirmar?custodiadoId=${custodiadoId}`);
   };
 
   const handleVerHistoricoEnderecos = () => {
@@ -244,14 +247,12 @@ export default function CustodiadoDetailPage() {
       {/* ═══ HEADER COM STATUS ═══ */}
       <div className={`${isConformidade ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : 'bg-gradient-to-r from-red-600 to-red-700'} text-white`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
-          {/* Voltar */}
           <button onClick={() => router.back()} className="flex items-center gap-2 text-white/70 hover:text-white mb-4 transition-colors text-sm">
             <ArrowLeft className="w-4 h-4" />
             <span>Voltar para a lista</span>
           </button>
 
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            {/* Info principal */}
             <div className="flex items-start gap-4 flex-1 min-w-0">
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
                 <User className="w-7 h-7 text-white" />
@@ -291,7 +292,6 @@ export default function CustodiadoDetailPage() {
               </div>
             </div>
 
-            {/* Ações do header */}
             <div className="flex flex-wrap gap-2 flex-shrink-0">
               <button onClick={handleConfirmarPresenca}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all shadow-lg ${compHoje || compAtrasado
@@ -355,7 +355,6 @@ export default function CustodiadoDetailPage() {
         {/* ── TAB: RESUMO ── */}
         {activeTab === 'resumo' && (
           <div className="space-y-6">
-            {/* Cards de Status */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {[
                 {
@@ -379,7 +378,6 @@ export default function CustodiadoDetailPage() {
               ))}
             </div>
 
-            {/* Dados Processuais */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-5 py-3.5 border-b border-gray-100 bg-blue-50/60">
                 <h3 className="text-base font-semibold text-blue-900 flex items-center gap-2">
@@ -403,7 +401,6 @@ export default function CustodiadoDetailPage() {
               </div>
             </div>
 
-            {/* Endereço Atual */}
             {custodiado.endereco ? (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-gray-100 bg-green-50/60 flex items-center justify-between">
@@ -434,7 +431,6 @@ export default function CustodiadoDetailPage() {
               </div>
             )}
 
-            {/* Ações Rápidas */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <h3 className="text-base font-semibold text-gray-800 mb-3">Ações Rápidas</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -593,7 +589,6 @@ export default function CustodiadoDetailPage() {
               )}
             </div>
 
-            {/* Cards de resumo do histórico */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <p className="text-xs text-gray-500">Primeiro Comparecimento</p>

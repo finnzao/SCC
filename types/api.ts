@@ -9,10 +9,15 @@ export enum StatusComparecimento {
 
 
 
+/**
+ * TipoValidacao - DEVE ser enviado em minúsculas para o backend.
+ * O backend faz parsing case-sensitive e rejeita valores em MAIÚSCULAS.
+ * Valores válidos: "presencial", "online", "cadastro_inicial"
+ */
 export enum TipoValidacao {
-  PRESENCIAL = 'PRESENCIAL',
-  ONLINE = 'ONLINE',
-  CADASTRO_INICIAL = 'CADASTRO_INICIAL'
+  PRESENCIAL = 'presencial',
+  ONLINE = 'online',
+  CADASTRO_INICIAL = 'cadastro_inicial'
 }
 
 export enum TipoUsuario {

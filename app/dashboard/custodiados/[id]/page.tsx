@@ -17,19 +17,11 @@ import { FormattingCPF as formatCPF, FormattingPhone as formatPhone } from '@/li
 import EditarCustodiadoModal from '@/components/EditarCustodiado';
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
 
-/**
- * All data comes from a SINGLE call: GET /api/custodiados/{uuid}
- *
- * The response already contains: processo, vara, comarca, dataDecisao,
- * periodicidade, status, ultimoComparecimento, proximoComparecimento,
- * diasAtraso, endereco, observacoes — no need for separate API calls.
- *
- * For comparecimentos history we use: GET /api/comparecimentos/custodiado/{uuid}
- * (the backend accepts UUID in this endpoint too based on the response structure)
- */
+
 
 interface CustodiadoResponse {
-  id: string; // UUID
+  id: string;
+  numericId?: number;
   nome: string;
   cpf: string | null;
   rg: string | null;
@@ -104,6 +96,9 @@ function CustodiadoDetalhesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // numericId resolved from custodiado data or processos
+  const [numericId, setNumericId] = useState<number | null>(null);
+
   const [comparecimentos, setComparecimentos] = useState<ComparecimentoResumido[]>([]);
   const [loadingComparecimentos, setLoadingComparecimentos] = useState(false);
 
@@ -130,6 +125,36 @@ function CustodiadoDetalhesPage() {
         setCustodiado(null);
       } else {
         setCustodiado(data);
+
+        // Try to extract numericId from response
+        const resolvedNumericId = data.numericId
+          || (typeof data.id === 'number' ? data.id : null);
+
+        if (resolvedNumericId && typeof resolvedNumericId === 'number') {
+          setNumericId(resolvedNumericId);
+        } else {
+          // If numericId not in custodiado response, try to get it from processos
+          // by searching with the processo number
+          try {
+            const processosResp = await httpClient.get<any>(`/processos`, {
+              termo: data.processo,
+              page: 0,
+              size: 1
+            });
+            if (processosResp.success && processosResp.data) {
+              const processos = processosResp.data?.data?.processos
+                || processosResp.data?.processos
+                || processosResp.data?.data
+                || processosResp.data;
+              const lista = Array.isArray(processos) ? processos : [];
+              if (lista.length > 0 && lista[0].custodiadoId) {
+                setNumericId(lista[0].custodiadoId);
+              }
+            }
+          } catch {
+            console.warn('[CustodiadoDetalhes] Could not resolve numericId from processos');
+          }
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar dados');
@@ -139,14 +164,16 @@ function CustodiadoDetalhesPage() {
     }
   }, [custodiadoUuid]);
 
-  // ─── Comparecimentos (lazy load, uses UUID) ────────────────
+  // ─── Comparecimentos (uses numericId, NOT UUID) ────────────
 
   const carregarComparecimentos = useCallback(async () => {
-    if (!custodiadoUuid) return;
+    // CRITICAL FIX: Use numericId (Long) for comparecimentos endpoint
+    // The backend endpoint GET /api/comparecimentos/custodiado/{id} expects numericId
+    if (!numericId || numericId <= 0) return;
 
     setLoadingComparecimentos(true);
     try {
-      const resp = await httpClient.get<any>(`/comparecimentos/custodiado/${custodiadoUuid}`);
+      const resp = await httpClient.get<any>(`/comparecimentos/custodiado/${numericId}`);
       if (resp.success && resp.data) {
         const lista = Array.isArray(resp.data) ? resp.data : (resp.data?.data || []);
         const ordenados = [...lista].sort((a: any, b: any) =>
@@ -159,13 +186,13 @@ function CustodiadoDetalhesPage() {
     } finally {
       setLoadingComparecimentos(false);
     }
-  }, [custodiadoUuid]);
+  }, [numericId]);
 
   useEffect(() => { carregarDados(); }, [carregarDados]);
 
   useEffect(() => {
-    if (custodiado) carregarComparecimentos();
-  }, [custodiado, carregarComparecimentos]);
+    if (custodiado && numericId) carregarComparecimentos();
+  }, [custodiado, numericId, carregarComparecimentos]);
 
   useEffect(() => {
     if (searchParams.get('refresh') === 'true') {
@@ -178,8 +205,12 @@ function CustodiadoDetalhesPage() {
 
   const handleRegistrar = () => {
     if (!custodiado) return;
-    // Use the UUID — the comparecimento/confirmar page will resolve it
-    router.push(`/dashboard/comparecimento/confirmar?custodiadoId=${custodiado.id}`);
+    // Pass numericId if available, otherwise pass UUID and let confirmar page resolve
+    if (numericId && numericId > 0) {
+      router.push(`/dashboard/comparecimento/confirmar?custodiadoId=${numericId}`);
+    } else {
+      router.push(`/dashboard/comparecimento/confirmar?custodiadoId=${custodiado.id}`);
+    }
   };
 
   const handleEditSave = () => {
@@ -360,12 +391,14 @@ function CustodiadoDetalhesPage() {
               <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-primary" />Endereço Atual
               </h2>
-              <Link
-                href={`/dashboard/historicoComparecimento/enderecos/${c.id}`}
-                className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
-              >
-                <History className="w-4 h-4" />Ver Histórico
-              </Link>
+              {numericId && (
+                <Link
+                  href={`/dashboard/historicoComparecimento/enderecos/${numericId}`}
+                  className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+                >
+                  <History className="w-4 h-4" />Ver Histórico
+                </Link>
+              )}
             </div>
             <div className="text-gray-700 space-y-1">
               <p>
@@ -409,11 +442,10 @@ function CustodiadoDetalhesPage() {
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-medium text-gray-800 w-24">{formatToBrazilianDate(comp.dataComparecimento)}</span>
                     <span className="text-sm text-gray-600 w-20">{comp.horaComparecimento || '-'}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      comp.tipoValidacao?.toLowerCase() === 'presencial' ? 'bg-green-100 text-green-700' :
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${comp.tipoValidacao?.toLowerCase() === 'presencial' ? 'bg-green-100 text-green-700' :
                       comp.tipoValidacao?.toLowerCase() === 'online' ? 'bg-blue-100 text-blue-700' :
-                      'bg-purple-100 text-purple-700'
-                    }`}>{comp.tipoValidacao}</span>
+                        'bg-purple-100 text-purple-700'
+                      }`}>{comp.tipoValidacao}</span>
                   </div>
                   <span className="text-sm text-gray-500">Validado por: {comp.validadoPor}</span>
                 </div>
@@ -427,6 +459,7 @@ function CustodiadoDetalhesPage() {
           <p className="text-xs text-gray-400 text-center">
             Cadastrado em {formatToBrazilianDate(c.criadoEm)}
             {c.atualizadoEm ? ` · Atualizado em ${formatToBrazilianDate(c.atualizadoEm)}` : ''}
+            {numericId ? ` · ID: ${numericId}` : ''}
           </p>
         </div>
       </div>
@@ -435,7 +468,7 @@ function CustodiadoDetalhesPage() {
       {showEditModal && custodiado && (
         <EditarCustodiadoModal
           dados={{
-            id: c.id,
+            id: numericId || c.id,
             nome: c.nome,
             cpf: c.cpf,
             rg: c.rg,
