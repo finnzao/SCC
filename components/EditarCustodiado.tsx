@@ -11,6 +11,7 @@ import {
   FormattingRG,
   FormattingPhone,
   FormattingCEP,
+  normalizarDataParaEnvio,
 } from '@/lib/utils/formatting';
 import { ValidationCPF, ValidationPhone, ValidationCEP } from '@/lib/utils/validation';
 import { EstadoBrasil } from '@/types/api';
@@ -25,6 +26,12 @@ interface Props {
 interface ValidationErrors {
   [key: string]: string;
 }
+
+const ESTADOS_BRASIL_LIST = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+];
 
 const formatProcessoCNJ = (processo: string): string => {
   if (!processo) return '';
@@ -291,6 +298,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
       }
     }
 
+    // ✅ CORREÇÃO: Validação de documentos — CPF OU RG
     const cpfLimpo = String(form.cpf || '').replace(/\D/g, '');
     const rgLimpo = String(form.rg || '').replace(/\D/g, '');
 
@@ -388,7 +396,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     setForm((prev) => ({ ...prev, [name]: formattedValue }));
   }
 
-  function handleEnderecoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleEnderecoChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target;
 
     if (errors[name]) {
@@ -517,6 +525,12 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
     setLoading(true);
 
     try {
+      // ✅ FIX Bug 2: Normalizar datas antes do envio usando normalizarDataParaEnvio()
+      const dataDecisaoNormalizada = normalizarDataParaEnvio(String(form.dataDecisao));
+      const dataCompNormalizada = normalizarDataParaEnvio(
+        String(form.dataComparecimentoInicial || form.dataDecisao)
+      );
+
       const dadosAtualizacao = {
         nome: String(form.nome).trim(),
         cpf: String(form.cpf || '').replace(/\D/g, '') || undefined,
@@ -525,9 +539,9 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         processo: formatProcessoCNJ(String(form.processo)).replace(/\D/g, ''),
         vara: String(form.vara).trim(),
         comarca: String(form.comarca).trim(),
-        dataDecisao: String(form.dataDecisao),
+        dataDecisao: dataDecisaoNormalizada, // ✅ Normalizada
         periodicidade: periodicidadePersonalizada,
-        dataComparecimentoInicial: String(form.dataComparecimentoInicial || form.dataDecisao),
+        dataComparecimentoInicial: dataCompNormalizada, // ✅ Normalizada
         observacoes: String(form.observacoes || '').trim(),
         cep: String(form.endereco?.cep || '').replace(/\D/g, ''),
         logradouro: String(form.endereco?.logradouro || '').trim(),
@@ -619,6 +633,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         )}
 
+        {/* Dados Pessoais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <User className="w-5 h-5 text-primary" />
@@ -688,6 +703,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
+        {/* Dados Processuais */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-primary" />
@@ -779,6 +795,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
+        {/* Periodicidade e Datas */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-primary" />
@@ -837,6 +854,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </div>
         </div>
 
+        {/* Endereço */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5 text-primary" />
@@ -938,20 +956,24 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Estado (UF) <span className="text-red-500">*</span>
               </label>
-              <input
-                className={`w-full border ${errors.estado ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent uppercase transition-colors`}
+              <select
+                className={`w-full border ${errors.estado ? 'border-red-500 bg-red-50' : 'border-gray-300'} p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
                 name="estado"
                 value={form.endereco?.estado || ''}
                 onChange={handleEnderecoChange}
-                placeholder="BA"
-                maxLength={2}
                 disabled={loading}
-              />
+              >
+                <option value="">Selecione</option>
+                {ESTADOS_BRASIL_LIST.map(uf => (
+                  <option key={uf} value={uf}>{uf}</option>
+                ))}
+              </select>
               {errors.estado && <p className="text-red-500 text-xs mt-1">{errors.estado}</p>}
             </div>
           </div>
         </div>
 
+        {/* Observações */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
           <textarea
@@ -970,6 +992,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           </p>
         </div>
 
+        {/* Botões */}
         <div className="pt-4 flex justify-between border-t sticky bottom-0 bg-white">
           <button
             type="button"
