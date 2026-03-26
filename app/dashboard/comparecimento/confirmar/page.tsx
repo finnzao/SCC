@@ -16,10 +16,10 @@ import {
   ArrowLeft,
   MapPin,
   UserCheck,
-  ChevronDown,
-  ChevronUp,
   Search,
   RefreshCw,
+  ChevronRight,
+  Hash,
   type LucideIcon
 } from 'lucide-react';
 
@@ -47,76 +47,6 @@ declare global {
   interface Window {
     enderecoTimeout?: NodeJS.Timeout;
   }
-}
-
-interface MobileSectionProps {
-  title: string;
-  icon: LucideIcon;
-  isExpanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}
-
-function SeletorProcesso({
-  processos,
-  selecionado,
-  onSelecionar
-}: {
-  processos: Processo[];
-  selecionado: Processo | null;
-  onSelecionar: (p: Processo) => void;
-}) {
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-blue-200 p-4 mb-4">
-      <div className="flex items-center gap-2 mb-3">
-        <FileText className="w-5 h-5 text-blue-600" />
-        <h3 className="font-semibold text-gray-800">
-          {selecionado ? 'Processo selecionado' : 'Selecione o processo para registrar comparecimento'}
-        </h3>
-      </div>
-      {!selecionado && (
-        <p className="text-sm text-blue-700 mb-3">
-          Este custodiado possui {processos.length} processos ativos. Escolha para qual processo deseja registrar o comparecimento.
-        </p>
-      )}
-      <div className="space-y-2">
-        {processos.map(p => {
-          const isSelected = selecionado?.id === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => onSelecionar(p)}
-              className={`w-full text-left p-3 border-2 rounded-lg transition-all ${
-                isSelected
-                  ? 'border-primary bg-blue-50 ring-2 ring-primary/20'
-                  : 'border-gray-200 hover:border-primary hover:bg-blue-50'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="font-mono font-medium text-gray-800 text-sm">{p.numeroProcesso}</p>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                    <span>{p.vara}</span>
-                    <span>•</span>
-                    <span>{p.comarca}</span>
-                    <span className={p.status === 'EM_CONFORMIDADE' ? 'text-green-600' : 'text-red-600 font-medium'}>
-                      {p.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : `Inadimplente${p.diasAtraso > 0 ? ` — ${p.diasAtraso} dias` : ''}`}
-                    </span>
-                  </div>
-                  {p.periodicidadeDescricao && (
-                    <p className="text-xs text-gray-400 mt-1">Periodicidade: {p.periodicidadeDescricao}</p>
-                  )}
-                </div>
-                {isSelected && (
-                  <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 ml-2" />
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function getNumericIdFromProcesso(proc: any): number {
@@ -170,6 +100,70 @@ function resolveNumericId(custodiado: CustodiadoData | null): number {
   return (!isNaN(num) && num > 0) ? num : 0;
 }
 
+function StepIndicator({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: totalSteps }).map((_, i) => (
+        <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${
+          i < currentStep ? 'bg-primary w-8' : i === currentStep ? 'bg-primary/50 w-6' : 'bg-gray-200 w-4'
+        }`} />
+      ))}
+    </div>
+  );
+}
+
+function SeletorProcesso({
+  processos,
+  selecionado,
+  onSelecionar
+}: {
+  processos: Processo[];
+  selecionado: Processo | null;
+  onSelecionar: (p: Processo) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {processos.map(p => {
+        const isSelected = selecionado?.id === p.id;
+        return (
+          <button
+            key={p.id}
+            onClick={() => onSelecionar(p)}
+            className={`w-full text-left p-4 border-2 rounded-xl transition-all ${
+              isSelected
+                ? 'border-primary bg-blue-50/80 shadow-sm'
+                : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="font-mono font-semibold text-gray-800 text-sm">{p.numeroProcesso}</p>
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                  <span>{p.vara}</span>
+                  <span className="text-gray-300">·</span>
+                  <span>{p.comarca}</span>
+                  <span className="text-gray-300">·</span>
+                  <span>{p.periodicidadeDescricao}</span>
+                </div>
+                <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  p.status === 'EM_CONFORMIDADE' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {p.status === 'EM_CONFORMIDADE' ? 'Em Conformidade' : `Inadimplente${p.diasAtraso > 0 ? ` · ${p.diasAtraso}d` : ''}`}
+                </span>
+              </div>
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 transition-all ${
+                isSelected ? 'border-primary bg-primary' : 'border-gray-300'
+              }`}>
+                {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ConfirmarPresencaPage() {
   const router = useRouter();
   const searchParams = useSearchParamsSafe();
@@ -194,25 +188,17 @@ function ConfirmarPresencaPage() {
   const [formulario, setFormulario] = useState<FormularioComparecimento>({
     dataComparecimento: dateUtils.getCurrentDate(),
     horaComparecimento: dateUtils.getCurrentTime(),
-    tipoValidacao: TipoValidacao.PRESENCIAL, // Now correctly 'presencial' (lowercase)
+    tipoValidacao: TipoValidacao.PRESENCIAL,
     observacoes: '',
     validadoPor: ''
   });
   const [atualizacaoEndereco, setAtualizacaoEndereco] = useState<AtualizacaoEndereco>({ houveAlteracao: false });
   const [enderecoRespondido, setEnderecoRespondido] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>('busca');
   const [proximoComparecimento, setProximoComparecimento] = useState<string | null>(null);
   const [buscaInicialFeita, setBuscaInicialFeita] = useState(false);
 
+  const currentStep = !custodiado ? 0 : !processoSelecionado && temMultiplosProcessos ? 1 : !enderecoRespondido ? 2 : 3;
   const podeConfirmar = !!processoSelecionado && enderecoRespondido && !loadingComparecimento;
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     try {
@@ -268,7 +254,6 @@ function ConfirmarPresencaPage() {
           const numId = getNumericIdFromProcesso(proc);
           const enriched = enrichWithListData(fromProc, custodiados, numId);
           setCustodiado(enriched);
-
           if (numId > 0) {
             const todosAtivos = await carregarProcessosAtivos(numId);
             if (todosAtivos.length > 1) {
@@ -276,10 +261,7 @@ function ConfirmarPresencaPage() {
               setTemMultiplosProcessos(true);
             }
           }
-
-          setExpandedSection('dados-pessoais');
         }
-       
       } catch (err) {
         error('Erro', 'Não foi possível carregar o processo');
       } finally {
@@ -295,9 +277,7 @@ function ConfirmarPresencaPage() {
       try {
         setEstado('buscando');
         const numId = parseInt(custodiadoIdParam);
-        
         if (isNaN(numId) || numId <= 0) {
-          // custodiadoIdParam might be a UUID - try to resolve via custodiados list
           if (custodiados && custodiados.length > 0) {
             const match = custodiados.find((c: any) => String(c.id) === custodiadoIdParam);
             if (match) {
@@ -312,14 +292,12 @@ function ConfirmarPresencaPage() {
                   const enriched = enrichWithListData(fromProc, custodiados, resolvedNum);
                   setCustodiado(enriched);
                   definirProcessos(ativos);
-                  setExpandedSection(ativos.length === 1 ? 'dados-pessoais' : 'busca');
                 }
               }
             }
           }
           return;
         }
-
         const ativos = await carregarProcessosAtivos(numId);
         if (ativos.length >= 1) {
           const fromProc = buildCustodiadoFromProcesso(ativos[0]);
@@ -328,7 +306,6 @@ function ConfirmarPresencaPage() {
           const enriched = enrichWithListData(fromProc, custodiados, numId);
           setCustodiado(enriched);
           definirProcessos(ativos);
-          setExpandedSection(ativos.length === 1 ? 'dados-pessoais' : 'busca');
         }
       } catch {
         error('Erro', 'Não foi possível carregar os dados');
@@ -359,15 +336,14 @@ function ConfirmarPresencaPage() {
       if (encontrados.length > 0) {
         setResultadosBusca(encontrados);
         setMostrarResultados(true);
-        success('Resultados encontrados', `${encontrados.length} pessoa(s) encontrada(s)`);
       } else {
-        error('Pessoa não encontrada', 'Nenhuma pessoa encontrada para o termo informado');
+        error('Não encontrado', 'Nenhuma pessoa encontrada para o termo informado');
       }
     } catch {
       setEstado('inicial');
       error('Erro na busca', 'Ocorreu um erro ao buscar');
     }
-  }, [buscaProcesso, custodiados, success, error, normalizarTexto]);
+  }, [buscaProcesso, custodiados, error, normalizarTexto]);
 
   const selecionarPessoa = useCallback(async (pessoa: CustodiadoData) => {
     setCustodiado(pessoa);
@@ -375,21 +351,18 @@ function ConfirmarPresencaPage() {
     setProcessoSelecionado(null);
     setProcessosDisponiveis([]);
     setTemMultiplosProcessos(false);
-
+    setEnderecoRespondido(false);
+    setAtualizacaoEndereco({ houveAlteracao: false });
     const numId = resolveNumericId(pessoa);
     if (numId > 0) {
       const ativos = await carregarProcessosAtivos(numId);
       definirProcessos(ativos);
-      setExpandedSection(ativos.length === 1 ? 'dados-pessoais' : 'busca');
-    } else {
-      setExpandedSection('dados-pessoais');
     }
     success('Pessoa selecionada', `${pessoa.nome}`);
   }, [success, carregarProcessosAtivos, definirProcessos]);
 
   const selecionarProcesso = useCallback((proc: Processo) => {
     setProcessoSelecionado(proc);
-    setExpandedSection('dados-pessoais');
     success('Processo selecionado', proc.numeroProcesso);
   }, [success]);
 
@@ -425,36 +398,25 @@ function ConfirmarPresencaPage() {
     if (!custodiado) { error('Erro', 'Nenhuma pessoa selecionada'); return; }
     if (!processoSelecionado) { error('Selecione um processo', 'É necessário selecionar o processo para registrar o comparecimento'); return; }
     if (!enderecoRespondido) { error('Atenção', 'Você precisa responder se houve mudança de endereço'); return; }
-
     if (atualizacaoEndereco.houveAlteracao) {
       const e = atualizacaoEndereco.endereco;
       if (!e?.cep || !e?.logradouro || !e?.bairro || !e?.cidade || !e?.estado) { error('Endereço incompleto', 'Preencha todos os campos obrigatórios'); return; }
       if (!atualizacaoEndereco.motivoAlteracao || atualizacaoEndereco.motivoAlteracao.trim().length < 10) { error('Motivo inválido', 'O motivo deve ter pelo menos 10 caracteres'); return; }
     }
-
     setEstado('buscando');
     setLoadingComparecimento(true);
-
     try {
       const data = normalizarDataParaEnvio(formulario.dataComparecimento);
       if (data.includes('T') || data.includes('Z')) { error('Erro de formato', 'Data inválida'); setEstado('inicial'); setLoadingComparecimento(false); return; }
-
-      /**
-       * CRITICAL FIX: tipoValidacao must be sent in lowercase.
-       * The TipoValidacao enum now has lowercase values ('presencial', 'online', 'cadastro_inicial')
-       * but we ensure it here as well for safety.
-       */
       const tipoValidacaoValue = String(formulario.tipoValidacao).toLowerCase();
-
       const body: Record<string, any> = {
-        processoId: processoSelecionado.id, // Long ID from processo
+        processoId: processoSelecionado.id,
         dataComparecimento: data,
         horaComparecimento: formatarHora(formulario.horaComparecimento),
-        tipoValidacao: tipoValidacaoValue, // Always lowercase
+        tipoValidacao: tipoValidacaoValue,
         validadoPor: formulario.validadoPor.trim() || 'Sistema',
         mudancaEndereco: atualizacaoEndereco.houveAlteracao,
       };
-
       const custodiadoNumId = resolveNumericId(custodiado);
       if (custodiadoNumId > 0) body.custodiadoId = custodiadoNumId;
       if (formulario.observacoes?.trim()) body.observacoes = formulario.observacoes.trim();
@@ -470,9 +432,6 @@ function ConfirmarPresencaPage() {
           estado: atualizacaoEndereco.endereco.estado,
         };
       }
-
-      console.log('[ConfirmarPresenca] Enviando body:', JSON.stringify(body, null, 2));
-
       const result = await httpClient.post<any>('/comparecimentos/registrar', body);
       if (result.success) {
         setMensagem(`Comparecimento registrado com sucesso para ${custodiado.nome}`);
@@ -501,128 +460,28 @@ function ConfirmarPresencaPage() {
     setAtualizacaoEndereco(prev => ({ ...prev, endereco: { ...prev.endereco, ...novo } as Endereco }));
   };
 
-  const MobileSection = ({ title, icon: Icon, isExpanded, onToggle, children }: MobileSectionProps) => (
-    <div className="bg-white rounded-lg shadow-sm mb-3 overflow-hidden">
-      <button onClick={onToggle} className="w-full p-4 flex items-center justify-between text-left">
-        <div className="flex items-center gap-3"><Icon className="w-5 h-5 text-primary" /><span className="font-semibold text-gray-800">{title}</span></div>
-        {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-      </button>
-      {isExpanded && <div className="p-4 pt-0 border-t border-gray-100">{children}</div>}
-    </div>
-  );
-
   if (loadingCustodiados && !processoIdParam && !custodiadoIdParam) {
-    return (<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div><p className="text-lg text-gray-600">Carregando dados...</p></div></div>);
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando dados...</p>
+        </div>
+      </div>
+    );
   }
 
   if (errorCustodiados && !processoIdParam && !custodiadoIdParam) {
-    return (<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4"><div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md"><h3 className="text-red-800 font-semibold mb-2 flex items-center gap-2"><XCircle className="w-5 h-5" />Erro ao carregar dados</h3><p className="text-red-600 mb-4">{errorCustodiados}</p><button onClick={() => refetch()} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Tentar Novamente</button></div></div>);
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md">
+          <h3 className="text-red-800 font-semibold mb-2 flex items-center gap-2"><XCircle className="w-5 h-5" />Erro ao carregar dados</h3>
+          <p className="text-red-600 mb-4">{errorCustodiados}</p>
+          <button onClick={() => refetch()} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Tentar Novamente</button>
+        </div>
+      </div>
+    );
   }
-
-  const renderProcessoInfo = () => {
-    if (!processoSelecionado) return null;
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-blue-600 font-medium">Processo selecionado</p>
-            <p className="font-mono text-sm text-blue-900">{processoSelecionado.numeroProcesso}</p>
-            <p className="text-xs text-blue-700">{processoSelecionado.vara} • {processoSelecionado.comarca} • {formatarPeriodicidade(processoSelecionado.periodicidade)}</p>
-          </div>
-          {temMultiplosProcessos && (
-            <button onClick={trocarProcesso} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 flex-shrink-0">
-              <RefreshCw className="w-3 h-3" />Trocar
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderBuscaSection = () => (
-    <div className="space-y-3">
-      <div className="relative">
-        <input type="text" value={buscaProcesso} onChange={(e) => setBuscaProcesso(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()} placeholder="Nome, CPF ou processo..." className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm" />
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-      </div>
-      <button onClick={buscarPessoa} disabled={estado === 'buscando'} className="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50">{estado === 'buscando' ? 'Buscando...' : 'Buscar'}</button>
-      {mostrarResultados && resultadosBusca.length > 0 && (
-        <div className="space-y-2 mt-4">
-          <p className="text-sm font-medium text-gray-700">{resultadosBusca.length} resultado(s):</p>
-          {resultadosBusca.map((p, i) => (
-            <button key={i} onClick={() => selecionarPessoa(p)} className="w-full p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors text-left">
-              <p className="font-medium text-gray-800">{p.nome}</p><p className="text-sm text-gray-600">{p.processo}</p><p className="text-xs text-gray-500">CPF: {p.cpf}</p>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderDadosPessoais = () => (
-    <div className="space-y-3">
-      {renderProcessoInfo()}
-      <div><p className="text-xs text-gray-500">Nome</p><p className="font-medium text-gray-800">{custodiado?.nome}</p></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><p className="text-xs text-gray-500">CPF</p><p className="font-medium text-gray-800">{custodiado?.cpf || 'Não informado'}</p></div>
-        <div><p className="text-xs text-gray-500">RG</p><p className="font-medium text-gray-800">{custodiado?.rg || 'Não informado'}</p></div>
-      </div>
-      <div><p className="text-xs text-gray-500">Periodicidade</p><p className="font-medium text-gray-800">{formatarPeriodicidade(processoSelecionado?.periodicidade || custodiado?.periodicidade || 30)}</p></div>
-    </div>
-  );
-
-  const renderEnderecoSection = () => {
-    if (!enderecoRespondido) {
-      return (
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800 mb-3 font-medium">O endereço cadastrado está correto?</p>
-            {custodiado?.endereco ? (
-              <div className="text-sm text-blue-700 space-y-1">
-                <p>{custodiado.endereco.logradouro}{custodiado.endereco.numero ? `, ${custodiado.endereco.numero}` : ''}</p>
-                <p>{custodiado.endereco.bairro}</p>
-                <p>{custodiado.endereco.cidade} - {custodiado.endereco.estado}</p>
-                <p>CEP: {custodiado.endereco.cep}</p>
-              </div>
-            ) : (<p className="text-sm text-blue-600 italic">Nenhum endereço cadastrado</p>)}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => { setEnderecoRespondido(true); setAtualizacaoEndereco({ houveAlteracao: false }); }} className="bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 font-medium flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5" />Sim, correto</button>
-            <button onClick={() => { setEnderecoRespondido(true); setAtualizacaoEndereco({ houveAlteracao: true, endereco: custodiado?.endereco || { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' } }); }} className="bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center gap-2"><AlertCircle className="w-5 h-5" />Houve mudança</button>
-          </div>
-        </div>
-      );
-    }
-    if (atualizacaoEndereco.houveAlteracao) {
-      return (
-        <div>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4"><p className="text-orange-800 font-medium text-sm">Atualização de endereço necessária</p></div>
-          <EnderecoForm endereco={atualizacaoEndereco.endereco!} onEnderecoChange={handleEnderecoChange} />
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Motivo da alteração *</label>
-            <textarea value={atualizacaoEndereco.motivoAlteracao || ''} onChange={(e) => setAtualizacaoEndereco(prev => ({ ...prev, motivoAlteracao: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" placeholder="Mínimo 10 caracteres." minLength={10} maxLength={500} />
-          </div>
-          <button onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }} className="text-orange-600 hover:text-orange-800 underline text-sm mt-3">Alterar resposta</button>
-        </div>
-      );
-    }
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2"><CheckCircle className="w-5 h-5 text-green-600" /><p className="text-green-800 font-medium text-sm">Endereço confirmado</p></div>
-        <button onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }} className="text-green-600 hover:text-green-800 text-sm underline">Alterar resposta</button>
-      </div>
-    );
-  };
-
-  const renderFormComparecimento = () => (
-    <div className="space-y-4">
-      <div><label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Validação *</label><select value={formulario.tipoValidacao} onChange={(e) => handleInputChange('tipoValidacao', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value={TipoValidacao.PRESENCIAL}>Presencial</option><option value={TipoValidacao.ONLINE}>Balcão Virtual</option><option value={TipoValidacao.CADASTRO_INICIAL}>Cadastro Inicial</option></select></div>
-      <div><label className="block text-sm font-medium text-gray-700 mb-2">Validado por *</label><div className="relative"><User className="absolute left-3 top-3 w-5 h-5 text-gray-400" /><input type="text" value={formulario.validadoPor} readOnly className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed" /></div></div>
-      <div><label className="block text-sm font-medium text-gray-700 mb-2">Data *</label><div className="relative"><Calendar className="absolute left-3 top-3 w-5 h-5 text-gray-400" /><input type="date" value={formulario.dataComparecimento} onChange={(e) => handleInputChange('dataComparecimento', e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg" /></div></div>
-      <div><label className="block text-sm font-medium text-gray-700 mb-2">Horário *</label><div className="relative"><Clock className="absolute left-3 top-3 w-5 h-5 text-gray-400" /><input type="time" value={formulario.horaComparecimento} onChange={(e) => handleInputChange('horaComparecimento', e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg" /></div></div>
-      <div><label className="block text-sm font-medium text-gray-700 mb-2">Observações</label><textarea value={formulario.observacoes} onChange={(e) => handleInputChange('observacoes', e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" placeholder="Adicione observações..." /></div>
-    </div>
-  );
 
   const mostrarFormularioCompleto = !!custodiado && !!processoSelecionado;
   const mostrarSeletorProcesso = !!custodiado && temMultiplosProcessos && !processoSelecionado;
@@ -630,169 +489,313 @@ function ConfirmarPresencaPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-4 md:p-6">
-        <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-800"><ArrowLeft className="w-6 h-6" /></button>
-            <h1 className="text-2xl md:text-3xl font-bold text-primary-dark">Confirmar Comparecimento</h1>
+      <div className="max-w-3xl mx-auto p-4 md:p-6">
+
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => router.back()} className="text-gray-500 hover:text-gray-800 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex-1">
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Confirmar Comparecimento</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Registre o comparecimento de forma rápida e eficiente</p>
           </div>
-          <p className="text-gray-600 text-sm md:text-base ml-9 md:ml-0">Registre o comparecimento de forma rápida e eficiente</p>
+          <StepIndicator currentStep={currentStep} totalSteps={4} />
         </div>
 
         {estado === 'sucesso' && (
-          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-6 animate-in fade-in slide-in-from-top-4">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
             <div className="flex items-start gap-4">
-              <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
+              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="w-6 h-6 text-emerald-600" />
+              </div>
               <div className="flex-1">
-                <h3 className="text-green-800 font-semibold text-lg mb-2">Sucesso!</h3>
-                <p className="text-green-700 mb-3">{mensagem}</p>
-                {proximoComparecimento && (<div className="bg-white rounded-lg p-4 border border-green-200"><p className="text-sm text-gray-600 mb-1">Próximo comparecimento calculado:</p><p className="text-lg font-semibold text-primary">{proximoComparecimento}</p></div>)}
-                <p className="text-sm text-green-600 mt-3">Redirecionando...</p>
+                <h3 className="text-emerald-800 font-semibold text-lg mb-1">Sucesso!</h3>
+                <p className="text-emerald-700 text-sm">{mensagem}</p>
+                {proximoComparecimento && (
+                  <div className="mt-3 bg-white rounded-lg p-3 border border-emerald-200">
+                    <p className="text-xs text-gray-500 mb-0.5">Próximo comparecimento calculado:</p>
+                    <p className="text-base font-semibold text-primary">{proximoComparecimento}</p>
+                  </div>
+                )}
+                <p className="text-xs text-emerald-500 mt-3">Redirecionando...</p>
               </div>
             </div>
           </div>
         )}
 
         {estado === 'erro' && (
-          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6 mb-6 animate-in fade-in slide-in-from-top-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
             <div className="flex items-start gap-4">
-              <XCircle className="w-8 h-8 text-red-600 flex-shrink-0 mt-1" />
+              <XCircle className="w-8 h-8 text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-red-800 font-semibold text-lg mb-2">Erro ao Registrar</h3>
-                <p className="text-red-700 mb-4">{mensagem}</p>
-                <button onClick={() => setEstado('inicial')} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Tentar Novamente</button>
+                <h3 className="text-red-800 font-semibold mb-1">Erro ao Registrar</h3>
+                <p className="text-red-700 text-sm mb-3">{mensagem}</p>
+                <button onClick={() => setEstado('inicial')} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm">Tentar Novamente</button>
               </div>
             </div>
           </div>
         )}
 
-        {mostrarSeletorProcesso && (
-          <SeletorProcesso processos={processosDisponiveis} selecionado={processoSelecionado} onSelecionar={selecionarProcesso} />
-        )}
+        {estado !== 'sucesso' && (
+          <div className="space-y-5">
 
-        {mostrarAvisoSemProcesso && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-yellow-800 font-semibold mb-1">Nenhum processo ativo</h3>
-                <p className="text-yellow-700 text-sm">Este custodiado não possui processos ativos para registrar comparecimento.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isMobile && estado !== 'sucesso' && (
-          <div className="space-y-3">
             {!processoIdParam && !custodiadoIdParam && (
-              <MobileSection title="Buscar Pessoa" icon={Search} isExpanded={expandedSection === 'busca'} onToggle={() => setExpandedSection(expandedSection === 'busca' ? null : 'busca')}>
-                {renderBuscaSection()}
-              </MobileSection>
-            )}
-            {mostrarFormularioCompleto && (
-              <>
-                <MobileSection title="Dados Pessoais" icon={User} isExpanded={expandedSection === 'dados-pessoais'} onToggle={() => setExpandedSection(expandedSection === 'dados-pessoais' ? null : 'dados-pessoais')}>
-                  {renderDadosPessoais()}
-                </MobileSection>
-                <MobileSection title="Verificação de Endereço" icon={MapPin} isExpanded={expandedSection === 'endereco'} onToggle={() => setExpandedSection(expandedSection === 'endereco' ? null : 'endereco')}>
-                  {renderEnderecoSection()}
-                </MobileSection>
-                <MobileSection title="Dados do Comparecimento" icon={FileText} isExpanded={expandedSection === 'comparecimento'} onToggle={() => setExpandedSection(expandedSection === 'comparecimento' ? null : 'comparecimento')}>
-                  {renderFormComparecimento()}
-                </MobileSection>
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-bottom">
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => router.back()} className="bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300">Cancelar</button>
-                    <button onClick={confirmarComparecimento} disabled={!podeConfirmar} className="bg-green-500 text-white py-3 rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                      {loadingComparecimento ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <><Save className="w-5 h-5" />Confirmar</>}
-                    </button>
-                  </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-gray-100">
+                  <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <Search className="w-4 h-4 text-primary" />
+                    Buscar Pessoa
+                  </h2>
                 </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {!isMobile && estado !== 'sucesso' && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="space-y-8">
-              {!processoIdParam && !custodiadoIdParam && (
-                <div className="space-y-4">
-                  <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2"><Search className="w-5 h-5" />Buscar Pessoa</h3>
-                  <div className="flex gap-3">
-                    <input type="text" value={buscaProcesso} onChange={(e) => setBuscaProcesso(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()} placeholder="Digite o nome, CPF ou número do processo..." className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" />
-                    <button onClick={buscarPessoa} disabled={estado === 'buscando'} className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 font-medium flex items-center gap-2"><Search className="w-5 h-5" />{estado === 'buscando' ? 'Buscando...' : 'Buscar'}</button>
+                <div className="p-5 space-y-3">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <input type="text" value={buscaProcesso} onChange={(e) => setBuscaProcesso(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && buscarPessoa()}
+                        placeholder="Nome, CPF ou processo..."
+                        className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+                    </div>
+                    <button onClick={buscarPessoa} disabled={estado === 'buscando'}
+                      className="px-5 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 text-sm font-medium">
+                      {estado === 'buscando' ? 'Buscando...' : 'Buscar'}
+                    </button>
                   </div>
                   {mostrarResultados && resultadosBusca.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-gray-700">{resultadosBusca.length} resultado(s):</p>
-                      <div className="grid gap-3">
-                        {resultadosBusca.map((p, i) => (
-                          <button key={i} onClick={() => selecionarPessoa(p)} className="p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 text-left">
-                            <div className="flex items-center justify-between"><div><p className="font-semibold text-gray-800 text-lg">{p.nome}</p><p className="text-gray-600">{p.processo}</p><p className="text-sm text-gray-500">CPF: {p.cpf}</p></div><UserCheck className="w-6 h-6 text-primary" /></div>
-                          </button>
-                        ))}
-                      </div>
+                      <p className="text-xs font-medium text-gray-500">{resultadosBusca.length} resultado(s):</p>
+                      {resultadosBusca.map((p, i) => (
+                        <button key={i} onClick={() => selecionarPessoa(p)}
+                          className="w-full p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50/50 transition-all text-left">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-gray-800 text-sm">{p.nome}</p>
+                              <p className="text-xs text-gray-500">{p.processo} · CPF: {p.cpf || '—'}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+            )}
 
-              {mostrarFormularioCompleto && (
-                <>
-                  <div className="border-t border-gray-200 pt-6">
-                    <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2"><User className="w-5 h-5" />Dados da Pessoa Selecionada</h3>
-                    {renderProcessoInfo()}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-gray-50 p-6 rounded-lg">
-                      <div><p className="text-sm text-gray-500 mb-1">Nome Completo</p><p className="font-semibold text-gray-800">{custodiado?.nome}</p></div>
-                      <div><p className="text-sm text-gray-500 mb-1">CPF</p><p className="font-semibold text-gray-800">{custodiado?.cpf || 'Não informado'}</p></div>
-                      <div><p className="text-sm text-gray-500 mb-1">RG</p><p className="font-semibold text-gray-800">{custodiado?.rg || 'Não informado'}</p></div>
-                      <div><p className="text-sm text-gray-500 mb-1">Vara</p><p className="font-semibold text-gray-800">{processoSelecionado?.vara || custodiado?.vara}</p></div>
-                      <div><p className="text-sm text-gray-500 mb-1">Comarca</p><p className="font-semibold text-gray-800">{processoSelecionado?.comarca || custodiado?.comarca}</p></div>
-                      <div><p className="text-sm text-gray-500 mb-1">Periodicidade</p><p className="font-semibold text-gray-800">{formatarPeriodicidade(processoSelecionado?.periodicidade || custodiado?.periodicidade || 30)}</p></div>
+            {custodiado && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-gray-100">
+                  <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <User className="w-4 h-4 text-primary" />
+                    Pessoa Selecionada
+                  </h2>
+                </div>
+                <div className="p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800">{custodiado.nome}</p>
+                      <p className="text-xs text-gray-500">{custodiado.cpf || 'CPF não informado'} · {custodiado.rg || 'RG não informado'}</p>
                     </div>
                   </div>
+                  {processoSelecionado && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-blue-600 font-medium">Processo selecionado</p>
+                        <p className="font-mono text-sm text-blue-900">{processoSelecionado.numeroProcesso}</p>
+                        <p className="text-xs text-blue-700">{processoSelecionado.vara} · {processoSelecionado.comarca} · {formatarPeriodicidade(processoSelecionado.periodicidade)}</p>
+                      </div>
+                      {temMultiplosProcessos && (
+                        <button onClick={trocarProcesso} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 flex-shrink-0 font-medium">
+                          <RefreshCw className="w-3 h-3" />Trocar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-                  <div className="space-y-6">
-                    <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2"><MapPin className="w-5 h-5" />Verificação de Endereço</h3>
-                    {renderEnderecoSection()}
+            {mostrarSeletorProcesso && (
+              <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-blue-100 bg-blue-50/50">
+                  <h2 className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Selecione o Processo
+                  </h2>
+                  <p className="text-xs text-blue-600 mt-0.5">
+                    Este custodiado possui {processosDisponiveis.length} processos ativos. Escolha para qual deseja registrar.
+                  </p>
+                </div>
+                <div className="p-5">
+                  <SeletorProcesso processos={processosDisponiveis} selecionado={processoSelecionado} onSelecionar={selecionarProcesso} />
+                </div>
+              </div>
+            )}
+
+            {mostrarAvisoSemProcesso && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-amber-800 font-semibold text-sm mb-1">Nenhum processo ativo</h3>
+                  <p className="text-amber-700 text-xs">Este custodiado não possui processos ativos para registrar comparecimento.</p>
+                </div>
+              </div>
+            )}
+
+            {mostrarFormularioCompleto && (
+              <>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-gray-100">
+                    <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      Verificação de Endereço
+                    </h2>
                   </div>
+                  <div className="p-5">
+                    {!enderecoRespondido ? (
+                      <div className="space-y-3">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-sm text-blue-800 font-medium mb-2">O endereço cadastrado está correto?</p>
+                          {custodiado?.endereco ? (
+                            <div className="text-sm text-blue-700 space-y-0.5">
+                              <p>{custodiado.endereco.logradouro}{custodiado.endereco.numero ? `, ${custodiado.endereco.numero}` : ''}</p>
+                              <p>{custodiado.endereco.bairro} · {custodiado.endereco.cidade} - {custodiado.endereco.estado}</p>
+                              <p>CEP: {custodiado.endereco.cep}</p>
+                            </div>
+                          ) : (<p className="text-sm text-blue-600 italic">Nenhum endereço cadastrado</p>)}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button onClick={() => { setEnderecoRespondido(true); setAtualizacaoEndereco({ houveAlteracao: false }); }}
+                            className="bg-emerald-500 text-white py-3 rounded-lg hover:bg-emerald-600 font-medium flex items-center justify-center gap-2 text-sm transition-colors">
+                            <CheckCircle className="w-4 h-4" />Sim, correto
+                          </button>
+                          <button onClick={() => { setEnderecoRespondido(true); setAtualizacaoEndereco({ houveAlteracao: true, endereco: custodiado?.endereco || { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' } }); }}
+                            className="bg-amber-500 text-white py-3 rounded-lg hover:bg-amber-600 font-medium flex items-center justify-center gap-2 text-sm transition-colors">
+                            <AlertCircle className="w-4 h-4" />Houve mudança
+                          </button>
+                        </div>
+                      </div>
+                    ) : atualizacaoEndereco.houveAlteracao ? (
+                      <div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-4 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600" />
+                          <p className="text-amber-800 font-medium text-xs">Atualização de endereço necessária</p>
+                        </div>
+                        <EnderecoForm endereco={atualizacaoEndereco.endereco!} onEnderecoChange={handleEnderecoChange} />
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Motivo da alteração *</label>
+                          <textarea value={atualizacaoEndereco.motivoAlteracao || ''}
+                            onChange={(e) => setAtualizacaoEndereco(prev => ({ ...prev, motivoAlteracao: e.target.value }))}
+                            rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                            placeholder="Mínimo 10 caracteres." minLength={10} maxLength={500} />
+                        </div>
+                        <button onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }}
+                          className="text-amber-600 hover:text-amber-800 underline text-xs mt-2">Alterar resposta</button>
+                      </div>
+                    ) : (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-emerald-600" />
+                          <p className="text-emerald-800 font-medium text-sm">Endereço confirmado</p>
+                        </div>
+                        <button onClick={() => { setEnderecoRespondido(false); setAtualizacaoEndereco({ houveAlteracao: false }); }}
+                          className="text-emerald-600 hover:text-emerald-800 text-xs underline">Alterar</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                  <div className="space-y-6">
-                    <h3 className="text-xl font-semibold text-primary-dark flex items-center gap-2"><FileText className="w-5 h-5" />Registrar Comparecimento</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {renderFormComparecimento()}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-gray-100">
+                    <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-primary" />
+                      Dados do Comparecimento
+                    </h2>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Tipo de Validação *</label>
+                        <select value={formulario.tipoValidacao}
+                          onChange={(e) => handleInputChange('tipoValidacao', e.target.value)}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                          <option value={TipoValidacao.PRESENCIAL}>Presencial</option>
+                          <option value={TipoValidacao.ONLINE}>Balcão Virtual</option>
+                          <option value={TipoValidacao.CADASTRO_INICIAL}>Cadastro Inicial</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Validado por *</label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                          <input type="text" value={formulario.validadoPor} readOnly
+                            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 text-sm cursor-not-allowed" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Data *</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                          <input type="date" value={formulario.dataComparecimento}
+                            onChange={(e) => handleInputChange('dataComparecimento', e.target.value)}
+                            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Horário *</label>
+                        <div className="relative">
+                          <Clock className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                          <input type="time" value={formulario.horaComparecimento}
+                            onChange={(e) => handleInputChange('horaComparecimento', e.target.value)}
+                            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Observações</label>
+                      <textarea value={formulario.observacoes}
+                        onChange={(e) => handleInputChange('observacoes', e.target.value)}
+                        rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="Adicione observações opcionais..." />
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
-                    <button onClick={() => router.back()} className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">Cancelar</button>
-                    <button onClick={confirmarComparecimento} disabled={!podeConfirmar} className="px-8 py-3 rounded-lg font-medium flex items-center gap-2 shadow-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                      {loadingComparecimento ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Save className="w-5 h-5" />}
-                      Confirmar Presença
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+                <div className="flex items-center gap-3 pt-2 pb-20 md:pb-2">
+                  <button onClick={() => router.back()}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium text-sm transition-colors">
+                    Cancelar
+                  </button>
+                  <button onClick={confirmarComparecimento} disabled={!podeConfirmar}
+                    className="flex-1 sm:flex-none px-8 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 shadow-sm bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                    {loadingComparecimento ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    Confirmar Presença
+                  </button>
+                </div>
+              </>
+            )}
 
-        {estado === 'inicial' && !isMobile && (
-          <div className="mt-6 bg-blue-50 rounded-xl p-6">
-            <h3 className="font-semibold text-lg mb-3 text-blue-900 flex items-center gap-2"><AlertCircle className="w-5 h-5" />Orientações Importantes</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ul className="space-y-2 text-blue-800">
-                <li>• Certifique-se de que a pessoa realmente compareceu</li>
-                <li>• Sempre pergunte sobre mudança de endereço</li>
-                <li>• Registre o horário exato do atendimento</li>
-              </ul>
-              <ul className="space-y-2 text-blue-800">
-                <li>• Esta ação atualiza automaticamente o status</li>
-                <li>• O próximo comparecimento será calculado automaticamente</li>
-                <li>• Todos os dados são sincronizados em tempo real</li>
-              </ul>
-            </div>
+            {estado === 'inicial' && !custodiado && !processoIdParam && !custodiadoIdParam && (
+              <div className="bg-blue-50 rounded-xl p-5 border border-blue-100">
+                <h3 className="font-semibold text-sm mb-2 text-blue-900 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />Orientações
+                </h3>
+                <div className="text-xs text-blue-800 space-y-1">
+                  <p>• Certifique-se de que a pessoa realmente compareceu</p>
+                  <p>• Sempre pergunte sobre mudança de endereço</p>
+                  <p>• O próximo comparecimento será calculado automaticamente</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
