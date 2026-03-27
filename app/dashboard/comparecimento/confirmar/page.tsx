@@ -100,6 +100,37 @@ function resolveNumericId(custodiado: CustodiadoData | null): number {
   return (!isNaN(num) && num > 0) ? num : 0;
 }
 
+function isUUID(val: any): boolean {
+  if (!val) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val));
+}
+
+function resolveCustodiadoUuid(custodiado: CustodiadoData | null, custodiados: CustodiadoData[] | null): string | null {
+  if (!custodiado) return null;
+  const rawId = (custodiado as any).publicId || (custodiado as any).uuid;
+  if (rawId && isUUID(rawId)) return String(rawId);
+  if (isUUID(custodiado.id)) return String(custodiado.id);
+  if (!custodiados || !Array.isArray(custodiados)) return null;
+  const numId = resolveNumericId(custodiado);
+  const match = custodiados.find((c: any) => {
+    if (isUUID(c.id) || isUUID(c.publicId)) {
+      const cNumId = c.numericId || (typeof c.id === 'number' ? c.id : 0);
+      if (typeof cNumId === 'number' && cNumId === numId) return true;
+    }
+    return false;
+  });
+  if (match) {
+    const uuid = (match as any).publicId || (isUUID(match.id) ? match.id : null);
+    if (uuid) return String(uuid);
+  }
+  const nameMatch = custodiados.find((c: any) => c.nome === custodiado.nome && (isUUID(c.id) || isUUID(c.publicId)));
+  if (nameMatch) {
+    const uuid = (nameMatch as any).publicId || (isUUID(nameMatch.id) ? nameMatch.id : null);
+    if (uuid) return String(uuid);
+  }
+  return null;
+}
+
 function StepIndicator({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
   return (
     <div className="flex items-center gap-1">
@@ -438,7 +469,12 @@ function ConfirmarPresencaPage() {
         setEstado('sucesso');
         await new Promise(r => setTimeout(r, 500));
         try { await refetch(); } catch { /* ignore */ }
-        setTimeout(() => router.push('/dashboard/geral'), 1500);
+        const custodiadoUuid = resolveCustodiadoUuid(custodiado, custodiados);
+        if (custodiadoUuid) {
+          setTimeout(() => router.push(`/dashboard/custodiados/${custodiadoUuid}?refresh=true`), 1500);
+        } else {
+          setTimeout(() => router.push('/dashboard/geral'), 1500);
+        }
       } else {
         throw new Error(result.message || result.error || 'Erro ao registrar comparecimento');
       }
