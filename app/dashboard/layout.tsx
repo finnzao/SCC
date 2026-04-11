@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ReactNode, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { FiHome, FiPlus, FiSettings, FiGrid, FiMenu, FiX, FiClock } from 'react-icons/fi';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const menuItems = [
   { label: 'Dashboard', path: '/dashboard', icon: FiHome },
@@ -162,7 +163,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         "p-4 md:p-6",
         "overflow-auto"
       )}>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </main>
     </div>
   );

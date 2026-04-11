@@ -61,32 +61,32 @@ interface ComparecimentoResumido {
   tipoValidacao: string; validadoPor: string; observacoes?: string; mudancaEndereco?: boolean;
 }
 
-const parseLocalDate = (ds: string): Date => { if (!ds) return new Date(); const [y,m,d] = ds.split('-').map(Number); return new Date(y,m-1,d); };
-const fmtBR = (d: string|null|undefined): string => { if (!d) return '—'; const dt = parseLocalDate(d); return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; };
-const getDaysUntil = (ds: string): number => { const h = new Date(); h.setHours(0,0,0,0); const t = parseLocalDate(ds); t.setHours(0,0,0,0); return Math.ceil((t.getTime()-h.getTime())/86400000); };
+const parseLocalDate = (ds: string): Date => { if (!ds) return new Date(); const [y, m, d] = ds.split('-').map(Number); return new Date(y, m - 1, d); };
+const fmtBR = (d: string | null | undefined): string => { if (!d) return '—'; const dt = parseLocalDate(d); return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`; };
+const getDaysUntil = (ds: string): number => { const h = new Date(); h.setHours(0, 0, 0, 0); const t = parseLocalDate(ds); t.setHours(0, 0, 0, 0); return Math.ceil((t.getTime() - h.getTime()) / 86400000); };
 const isOverdue = (ds: string): boolean => getDaysUntil(ds) < 0;
-const isTodayStr = (ds: string): boolean => { const h = new Date(); return ds === `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; };
+const isTodayStr = (ds: string): boolean => { const h = new Date(); return ds === `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`; };
 
 function TipoBadge({ tipo }: { tipo: string }) {
   const t = tipo?.toLowerCase() || '';
-  const cfg = t === 'presencial' ? { bg:'bg-emerald-50',text:'text-emerald-700',border:'border-emerald-200',label:'Presencial' }
-    : t === 'online' ? { bg:'bg-sky-50',text:'text-sky-700',border:'border-sky-200',label:'Online' }
-    : { bg:'bg-violet-50',text:'text-violet-700',border:'border-violet-200',label:'Cadastro Inicial' };
+  const cfg = t === 'presencial' ? { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Presencial' }
+    : t === 'online' ? { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', label: 'Online' }
+      : { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', label: 'Cadastro Inicial' };
   return <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${cfg.bg} ${cfg.text} ${cfg.border}`}>{cfg.label}</span>;
 }
 
 function StatusBadgeInline({ status, diasAtraso }: { status: string; diasAtraso: number }) {
   const isConf = status === 'EM_CONFORMIDADE';
-  return (<span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${isConf ? 'bg-emerald-100 text-emerald-800':'bg-red-100 text-red-800'}`}>
+  return (<span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${isConf ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
     {isConf ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-    {isConf ? 'Em Conformidade' : `Inadimplente${diasAtraso > 0 ? ` · ${diasAtraso}d`:''}`}
+    {isConf ? 'Em Conformidade' : `Inadimplente${diasAtraso > 0 ? ` · ${diasAtraso}d` : ''}`}
   </span>);
 }
 
 function SituacaoBadge({ situacao }: { situacao: string }) {
-  const cfg = situacao === 'ATIVO' ? { bg:'bg-blue-50',text:'text-blue-700',border:'border-blue-200',label:'Ativo' }
-    : situacao === 'ENCERRADO' ? { bg:'bg-gray-50',text:'text-gray-600',border:'border-gray-200',label:'Encerrado' }
-    : { bg:'bg-amber-50',text:'text-amber-700',border:'border-amber-200',label:'Suspenso' };
+  const cfg = situacao === 'ATIVO' ? { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', label: 'Ativo' }
+    : situacao === 'ENCERRADO' ? { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', label: 'Encerrado' }
+      : { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'Suspenso' };
   return <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${cfg.bg} ${cfg.text} ${cfg.border}`}>{cfg.label}</span>;
 }
 
@@ -164,7 +164,7 @@ function CustodiadoDetalhesPage() {
       setCustodiado(data);
       const rid = data.numericId || (typeof data.id === 'number' ? data.id : null);
       if (rid && typeof rid === 'number') { setNumericId(rid); }
-      else { try { const pr = await httpClient.get<any>('/processos', { termo: data.processo, page: 0, size: 1 }); if (pr.success) { const l = pr.data?.data?.processos || pr.data?.processos || pr.data?.data || pr.data; const a = Array.isArray(l)?l:[]; if (a.length > 0 && a[0].custodiadoId) setNumericId(a[0].custodiadoId); } } catch {} }
+      else { try { const pr = await httpClient.get<any>('/processos', { termo: data.processo, page: 0, size: 1 }); if (pr.success) { const l = pr.data?.data?.processos || pr.data?.processos || pr.data?.data || pr.data; const a = Array.isArray(l) ? l : []; if (a.length > 0 && a[0].custodiadoId) setNumericId(a[0].custodiadoId); } } catch { } }
     } catch (err: any) { setError(err.message || 'Erro ao carregar dados'); setCustodiado(null); }
     finally { setLoading(false); }
   }, [custodiadoUuid]);
@@ -172,14 +172,14 @@ function CustodiadoDetalhesPage() {
   const carregarProcessos = useCallback(async () => {
     if (!numericId || numericId <= 0) return;
     setLoadingProcessos(true);
-    try { const r = await httpClient.get<any>(`/processos/custodiado/${numericId}`); if (r.success && r.data) { const l = r.data?.data || r.data || []; setProcessos(Array.isArray(l)?l:[]); } }
+    try { const r = await httpClient.get<any>(`/processos/custodiado/${numericId}`); if (r.success && r.data) { const l = r.data?.data || r.data || []; setProcessos(Array.isArray(l) ? l : []); } }
     catch { setProcessos([]); } finally { setLoadingProcessos(false); }
   }, [numericId]);
 
   const carregarComparecimentos = useCallback(async () => {
     if (!numericId || numericId <= 0) return;
     setLoadingComparecimentos(true);
-    try { const r = await httpClient.get<any>(`/comparecimentos/custodiado/${numericId}`); if (r.success && r.data) { const l = Array.isArray(r.data)?r.data:(r.data?.data||[]); setComparecimentos([...l].sort((a:any,b:any)=>(b.dataComparecimento||'').localeCompare(a.dataComparecimento||'')).slice(0,5)); } }
+    try { const r = await httpClient.get<any>(`/comparecimentos/custodiado/${numericId}`); if (r.success && r.data) { const l = Array.isArray(r.data) ? r.data : (r.data?.data || []); setComparecimentos([...l].sort((a: any, b: any) => (b.dataComparecimento || '').localeCompare(a.dataComparecimento || '')).slice(0, 5)); } }
     catch { setComparecimentos([]); } finally { setLoadingComparecimentos(false); }
   }, [numericId]);
 
@@ -208,13 +208,15 @@ function CustodiadoDetalhesPage() {
 
   if (error || !custodiado) return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6"><div className="max-w-5xl mx-auto">
-      <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"><ArrowLeft className="w-5 h-5" /><span>Voltar</span></button>
+      <button onClick={() => router.push('/dashboard/geral')} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"><ArrowLeft className="w-5 h-5" /><span>Voltar</span></button>
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
         <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
         <div><h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados</h3><p className="text-red-600 mb-4">{error || 'Custodiado não encontrado'}</p>
           <button onClick={carregarDados} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"><RefreshCw className="w-4 h-4" />Tentar Novamente</button></div>
       </div>
-    </div></div>
+    </div>
+
+    </div>
   );
 
   const c = custodiado;
@@ -265,9 +267,8 @@ function CustodiadoDetalhesPage() {
               )}
               {isAtivo && (
                 <button onClick={() => handleRegistrar(proc.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    procAtrasado || procHoje ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}>
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${procAtrasado || procHoje ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}>
                   <UserCheck className="w-4 h-4" /><span className="hidden sm:inline">Comparecimento</span>
                 </button>
               )}
@@ -283,12 +284,12 @@ function CustodiadoDetalhesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-5">
-        <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors text-sm">
+        <button onClick={() => router.push('/dashboard/geral')} className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors text-sm">
           <ArrowLeft className="w-4 h-4" /><span className="font-medium">Voltar</span>
         </button>
 
-        <div className={`rounded-xl overflow-hidden shadow-sm border ${isConformidade ? 'border-emerald-200':'border-red-200'}`}>
-          <div className={`px-6 py-5 ${isConformidade ? 'bg-gradient-to-r from-emerald-600 to-emerald-700':'bg-gradient-to-r from-red-600 to-red-700'} text-white`}>
+        <div className={`rounded-xl overflow-hidden shadow-sm border ${isConformidade ? 'border-emerald-200' : 'border-red-200'}`}>
+          <div className={`px-6 py-5 ${isConformidade ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : 'bg-gradient-to-r from-red-600 to-red-700'} text-white`}>
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl md:text-3xl font-bold truncate">{c.nome}</h1>
@@ -298,8 +299,8 @@ function CustodiadoDetalhesPage() {
                   {c.contato && !c.contatoPendente && (<><span className="text-white/40">|</span><span className="flex items-center gap-1"><Phone className="w-3 h-3" />{formatPhone(c.contato)}</span></>)}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-3">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 backdrop-blur-sm">{isConformidade ? 'EM CONFORMIDADE':'INADIMPLENTE'}</span>
-                  {totalAtivos > 0 && (<span className="px-3 py-1 rounded-full text-xs font-medium bg-white/10 backdrop-blur-sm">{totalAtivos} processo{totalAtivos!==1?'s':''} ativo{totalAtivos!==1?'s':''}{totalInadimplentes > 0 && ` · ${totalInadimplentes} inadimplente${totalInadimplentes!==1?'s':''}`}</span>)}
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 backdrop-blur-sm">{isConformidade ? 'EM CONFORMIDADE' : 'INADIMPLENTE'}</span>
+                  {totalAtivos > 0 && (<span className="px-3 py-1 rounded-full text-xs font-medium bg-white/10 backdrop-blur-sm">{totalAtivos} processo{totalAtivos !== 1 ? 's' : ''} ativo{totalAtivos !== 1 ? 's' : ''}{totalInadimplentes > 0 && ` · ${totalInadimplentes} inadimplente${totalInadimplentes !== 1 ? 's' : ''}`}</span>)}
                 </div>
               </div>
               <div className="flex gap-2 flex-shrink-0">
@@ -333,7 +334,7 @@ function CustodiadoDetalhesPage() {
                 <button onClick={() => setProcessosEncerradosAberto(!processosEncerradosAberto)}
                   className="w-full flex items-center justify-between px-5 py-3 text-sm text-gray-500 hover:bg-gray-50 transition-colors">
                   <span className="flex items-center gap-2"><History className="w-4 h-4" />Processos Encerrados/Suspensos ({processosEncerrados.length})</span>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${processosEncerradosAberto ? 'rotate-180':''}`} />
+                  <ChevronDown className={`w-4 h-4 transition-transform ${processosEncerradosAberto ? 'rotate-180' : ''}`} />
                 </button>
                 {processosEncerradosAberto && (<div className="divide-y divide-gray-50">{processosEncerrados.map(proc => renderProcessoCard(proc, true))}</div>)}
               </div>
@@ -349,9 +350,9 @@ function CustodiadoDetalhesPage() {
               <div className="p-5"><div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0"><MapPin className="w-5 h-5 text-emerald-600" /></div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{c.endereco.logradouro}{c.endereco.numero ? `, ${c.endereco.numero}`:''}{c.endereco.complemento ? ` - ${c.endereco.complemento}`:''}</p>
+                  <p className="text-sm font-medium text-gray-800">{c.endereco.logradouro}{c.endereco.numero ? `, ${c.endereco.numero}` : ''}{c.endereco.complemento ? ` - ${c.endereco.complemento}` : ''}</p>
                   <p className="text-sm text-gray-500 mt-0.5">{c.endereco.bairro}</p>
-                  <p className="text-sm text-gray-500">{c.endereco.cidade}/{c.endereco.estado}{c.endereco.cep ? ` · CEP: ${c.endereco.cep}`:''}</p>
+                  <p className="text-sm text-gray-500">{c.endereco.cidade}/{c.endereco.estado}{c.endereco.cep ? ` · CEP: ${c.endereco.cep}` : ''}</p>
                   {c.endereco.periodoResidencia && <p className="text-xs text-gray-400 mt-1">{c.endereco.periodoResidencia}</p>}
                 </div>
               </div></div>
@@ -375,8 +376,8 @@ function CustodiadoDetalhesPage() {
                 {comparecimentos.map((comp, i) => (
                   <div key={comp.id} className="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${i === 0 ? 'bg-primary/10':'bg-gray-100'}`}>
-                        <Calendar className={`w-4 h-4 ${i === 0 ? 'text-primary':'text-gray-400'}`} />
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${i === 0 ? 'bg-primary/10' : 'bg-gray-100'}`}>
+                        <Calendar className={`w-4 h-4 ${i === 0 ? 'text-primary' : 'text-gray-400'}`} />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -396,7 +397,7 @@ function CustodiadoDetalhesPage() {
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <p className="text-xs text-gray-400 text-center">
-              Cadastrado em {formatToBrazilianDate(c.criadoEm)}{c.atualizadoEm ? ` · Atualizado em ${formatToBrazilianDate(c.atualizadoEm)}`:''}{numericId ? ` · ID: ${numericId}`:''}
+              Cadastrado em {formatToBrazilianDate(c.criadoEm)}{c.atualizadoEm ? ` · Atualizado em ${formatToBrazilianDate(c.atualizadoEm)}` : ''}{numericId ? ` · ID: ${numericId}` : ''}
             </p>
           </div>
         </div>
@@ -404,14 +405,16 @@ function CustodiadoDetalhesPage() {
 
       {showEditModal && custodiado && (
         <EditarCustodiadoModal
-          dados={{ id: numericId || c.id, nome: c.nome, cpf: c.cpf, rg: c.rg, contato: c.contato,
+          dados={{
+            id: numericId || c.id, nome: c.nome, cpf: c.cpf, rg: c.rg, contato: c.contato,
             processo: c.processo, vara: c.vara, comarca: c.comarca, dataDecisao: c.dataDecisao,
             periodicidade: c.periodicidade, dataComparecimentoInicial: c.dataComparecimentoInicial || '',
             status: c.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente',
             primeiroComparecimento: c.dataComparecimentoInicial || '', ultimoComparecimento: c.ultimoComparecimento || '',
             proximoComparecimento: c.proximoComparecimento || '',
-            endereco: c.endereco || { cep:'',logradouro:'',numero:'',complemento:'',bairro:'',cidade:'',estado:'' },
-            observacoes: c.observacoes } as any}
+            endereco: c.endereco || { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' },
+            observacoes: c.observacoes
+          } as any}
           onClose={() => setShowEditModal(false)} onVoltar={() => setShowEditModal(false)} onSave={handleEditCustodiadoSave} />
       )}
 

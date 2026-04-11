@@ -25,12 +25,8 @@ import {
   Loader2,
 } from 'lucide-react';
 
-// ── Constantes ──────────────────────────────────────────────
-
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 400;
-
-// ── Componente principal ────────────────────────────────────
 
 function GeralPage() {
   const router = useRouter();
@@ -38,20 +34,17 @@ function GeralPage() {
   const { showToast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // ── Estado de UI ──────────────────────────────────────────
-
   const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'EM_CONFORMIDADE' | 'INADIMPLENTE'>('todos');
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // ── Debounce para filtro de texto ─────────────────────────
-  // Evita fazer uma requisição ao backend a cada tecla digitada.
-  // Aguarda 400ms após o usuário parar de digitar.
-
   const [filtroTextoDebounced, setFiltroTextoDebounced] = useState('');
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Pula o primeiro render para não duplicar a requisição do autoLoad
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -65,9 +58,6 @@ function GeralPage() {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
   }, [filtroTexto]);
-
-  // ── Hook de paginação server-side ─────────────────────────
-  // Toda a filtragem, ordenação e paginação acontecem no backend.
 
   const {
     custodiados,
@@ -91,8 +81,6 @@ function GeralPage() {
     },
   });
 
-  // ── Sincronizar filtros com query params da URL ───────────
-
   useEffect(() => {
     const busca = searchParams.get('busca');
     const status = searchParams.get('status') as typeof filtroStatus | null;
@@ -100,16 +88,17 @@ function GeralPage() {
     if (status && status !== 'todos') setFiltroStatus(status);
   }, [searchParams]);
 
-  // ── Aplicar filtro de texto debounced ao backend ──────────
-
+  // Só aplica filtros a partir da segunda renderização (interação do usuário)
   useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
     aplicarFiltros({
       nome: filtroTextoDebounced || undefined,
       status: filtroStatus !== 'todos' ? filtroStatus : undefined,
     });
   }, [filtroTextoDebounced, filtroStatus, aplicarFiltros]);
-
-  // ── Atualizar URL com filtros ativos ──────────────────────
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -122,8 +111,6 @@ function GeralPage() {
       qs ? `${window.location.pathname}?${qs}` : window.location.pathname
     );
   }, [filtroTexto, filtroStatus]);
-
-  // ── Responsive check ──────────────────────────────────────
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -139,8 +126,6 @@ function GeralPage() {
       clearTimeout(timer);
     };
   }, []);
-
-  // ── Handlers ──────────────────────────────────────────────
 
   const handleVerDetalhes = useCallback(
     (item: CustodiadoData) => {
@@ -163,12 +148,6 @@ function GeralPage() {
     limparFiltrosHook();
   }, [limparFiltrosHook]);
 
-  /**
-   * EXPORTAÇÃO SERVER-SIDE:
-   * Chama o endpoint do backend que gera o Excel diretamente.
-   * O navegador não precisa da biblioteca XLSX nem segurar
-   * todos os dados em memória.
-   */
   const handleExportar = useCallback(async () => {
     setIsExporting(true);
     try {
@@ -222,14 +201,10 @@ function GeralPage() {
     [irParaPagina]
   );
 
-  // ── Variáveis derivadas ───────────────────────────────────
-
   const hasActiveFilters = filtroTexto || filtroStatus !== 'todos';
   const { paginaAtual, totalPaginas, totalItens } = paginacao;
   const startIndex = paginaAtual * paginacao.itensPorPagina;
   const endIndex = startIndex + custodiados.length;
-
-  // ── Helpers de urgência (calculados nos dados da página) ──
 
   const isToday = (ds: string): boolean => {
     if (!ds) return false;
@@ -257,8 +232,6 @@ function GeralPage() {
     d.setHours(0, 0, 0, 0);
     return Math.ceil((d.getTime() - h.getTime()) / 86400000);
   };
-
-  // ── Loading state ─────────────────────────────────────────
 
   if (loading && custodiados.length === 0) {
     return (
@@ -288,14 +261,10 @@ function GeralPage() {
     );
   }
 
-  // ── Render ────────────────────────────────────────────────
-
   return (
     <div className="min-h-screen bg-gray-50" ref={containerRef}>
       {isMobile ? (
-        /* ══════ MOBILE ══════ */
         <div className="p-4 space-y-4">
-          {/* Header com filtros e ações */}
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-xl font-bold text-gray-800">Custodiados</h1>
@@ -351,7 +320,6 @@ function GeralPage() {
             </div>
           </div>
 
-          {/* Cards mobile */}
           <div className="space-y-3">
             {custodiados.map((item, index) => {
               const proximo = (item as any).proximoComparecimento || '';
@@ -448,7 +416,6 @@ function GeralPage() {
             })}
           </div>
 
-          {/* Paginação mobile */}
           {totalPaginas > 1 && (
             <div className="flex items-center justify-center gap-2">
               <button
@@ -472,9 +439,7 @@ function GeralPage() {
           )}
         </div>
       ) : (
-        /* ══════ DESKTOP ══════ */
         <div className="p-6 max-w-7xl mx-auto space-y-6">
-          {/* Header e filtros */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -516,7 +481,6 @@ function GeralPage() {
               </div>
             </div>
 
-            {/* Filtros — enviam params ao backend, não filtram em JS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
@@ -560,7 +524,6 @@ function GeralPage() {
             </div>
           </div>
 
-          {/* Tabela de resultados */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
@@ -740,7 +703,6 @@ function GeralPage() {
               </table>
             </div>
 
-            {/* PAGINAÇÃO SERVER-SIDE: usa metadados retornados pelo backend */}
             {totalPaginas > 1 && (
               <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between">
@@ -792,7 +754,6 @@ function GeralPage() {
               </div>
             )}
 
-            {/* Estado vazio */}
             {custodiados.length === 0 && !loading && (
               <div className="p-8 text-center">
                 <Search className="w-12 h-12 mx-auto text-gray-400 mb-4" />

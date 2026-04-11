@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useRouter } from 'next/navigation';
 import { authService } from '@/lib/api/authService';
 import { httpClient } from '@/lib/http/client';
+import { logger } from '@/lib/utils/logger';
 
 interface Usuario {
   id: number;
@@ -36,22 +37,8 @@ interface PermissionsContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PermissionsContext = createContext<PermissionsContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-// Lista de rotas públicas que não precisam de autenticação
-const PUBLIC_ROUTES = [
-  '/login',
-  '/invite',
-  '/recuperar-senha',
-  '/redefinir-senha'
-];
-
-// Função helper para verificar se está em rota pública
-const isPublicRoute = (pathname: string): boolean => {
-  return PUBLIC_ROUTES.some(route => pathname.startsWith(route));
-};
+const PUBLIC_ROUTES = ['/login', '/invite', '/recuperar-senha', '/redefinir-senha'];
+const isPublicRoute = (pathname: string): boolean => PUBLIC_ROUTES.some(route => pathname.startsWith(route));
 
 const PERMISSIONS = {
   ADMIN: {
@@ -59,132 +46,95 @@ const PERMISSIONS = {
     comparecimentos: ['listar', 'visualizar', 'registrar', 'editar', 'cancelar', 'exportar'],
     sistema: ['configurar', 'gerenciarUsuarios', 'backup', 'logs'],
     relatorios: ['visualizar', 'gerar', 'exportar'],
-    biometria: ['cadastrar', 'verificar', 'gerenciar']
+    biometria: ['cadastrar', 'verificar', 'gerenciar'],
   },
   USUARIO: {
     pessoas: ['listar', 'visualizar', 'exportar'],
     comparecimentos: ['listar', 'visualizar', 'registrar', 'exportar'],
     sistema: [] as string[],
     relatorios: ['visualizar', 'exportar'],
-    biometria: ['verificar']
-  }
+    biometria: ['verificar'],
+  },
 };
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Usuario | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-
   const isAuthenticated = !!user;
 
   const isTokenExpired = (token: string): boolean => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      const expirationTime = payload.exp * 1000;
-      const currentTime = Date.now();
-      const timeUntilExpiry = expirationTime - currentTime;
-      
-      return timeUntilExpiry < 60000;
-    } catch (error) {
-      console.error('[AuthContext] Erro ao verificar expiração do token:', error);
+      return (payload.exp * 1000 - Date.now()) < 60000;
+    } catch {
       return true;
     }
   };
 
   const clearAuthData = useCallback(() => {
-    console.log('[AuthContext] Limpando dados de autenticação');
+    logger.log('[AuthContext] Limpando dados de autenticação');
     authService.clearAuth();
     document.cookie = 'auth-token=; path=/; max-age=0';
     setUser(null);
   }, []);
 
   const loadUser = useCallback(async () => {
-    // Não tenta carregar usuário em rotas públicas
     if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
-      console.log('[AuthContext] Em rota pública, não carregando usuário');
+      logger.log('[AuthContext] Em rota pública, não carregando usuário');
       setIsLoading(false);
       return;
     }
 
     try {
-      console.log('[AuthContext] Carregando dados do usuário');
-
       const accessToken = authService.getAccessToken();
-      
       if (!accessToken) {
-        console.log('[AuthContext] Nenhum token encontrado');
         clearAuthData();
         setIsLoading(false);
         return;
       }
 
       if (isTokenExpired(accessToken)) {
-        console.log('[AuthContext] Token expirado, tentando renovar');
-        
+        logger.log('[AuthContext] Token expirado, tentando renovar');
         const refreshToken = authService.getRefreshToken();
-        
         if (refreshToken) {
           try {
             const refreshResult = await authService.refreshToken({ refreshToken });
-            
             if (refreshResult.success && refreshResult.data) {
-              console.log('[AuthContext] Token renovado com sucesso');
-              
               httpClient.setAuthToken(refreshResult.data.accessToken);
-              
-              const maxAge = refreshResult.data.expiresIn || 3600;
-              document.cookie = `auth-token=${refreshResult.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
+              document.cookie = `auth-token=${refreshResult.data.accessToken}; path=/; max-age=${refreshResult.data.expiresIn || 3600}; samesite=lax`;
             } else {
-              console.warn('[AuthContext] Falha ao renovar token');
               clearAuthData();
               setIsLoading(false);
               return;
             }
-          } catch (error) {
-            console.error('[AuthContext] Erro ao renovar token:', error);
+          } catch {
             clearAuthData();
             setIsLoading(false);
             return;
           }
         } else {
-          console.warn('[AuthContext] Token expirado e sem refresh token');
           clearAuthData();
           setIsLoading(false);
           return;
         }
       } else {
-        console.log('[AuthContext] Token válido, configurando no httpClient');
         httpClient.setAuthToken(accessToken);
       }
 
-      console.log('[AuthContext] Buscando perfil do usuário');
       const profileResponse = await authService.getProfile();
-
       if (profileResponse.success && profileResponse.data) {
-        console.log('[AuthContext] Perfil carregado com sucesso:', profileResponse.data);
-        
         const userData = profileResponse.data || profileResponse.data;
-        
         setUser({
-          id: userData.id,
-          nome: userData.nome,
-          email: userData.email,
-          tipo: userData.tipo,
-          departamento: userData.departamento,
-          telefone: userData.telefone,
-          ultimoLogin: userData.ultimoLogin
+          id: userData.id, nome: userData.nome, email: userData.email, tipo: userData.tipo,
+          departamento: userData.departamento, telefone: userData.telefone, ultimoLogin: userData.ultimoLogin,
         });
       } else {
-        console.warn('[AuthContext] Falha ao carregar perfil, limpando autenticação');
         clearAuthData();
       }
     } catch (error: any) {
-      console.error('[AuthContext] Erro ao carregar usuário:', error);
-      
-      if (error.message?.includes('401') || error.message?.includes('expirada')) {
-        console.log('[AuthContext] Sessão expirada, limpando autenticação');
-        clearAuthData();
-      }
+      logger.error('[AuthContext] Erro ao carregar usuário:', error);
+      if (error.message?.includes('401') || error.message?.includes('expirada')) clearAuthData();
     } finally {
       setIsLoading(false);
     }
@@ -192,94 +142,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const handleTokenExpired = () => {
-      console.log('[AuthContext] Evento de token expirado recebido');
+      logger.log('[AuthContext] Evento de token expirado recebido');
       clearAuthData();
       router.push('/login');
     };
-
     window.addEventListener('token-expired', handleTokenExpired);
-
-    return () => {
-      window.removeEventListener('token-expired', handleTokenExpired);
-    };
+    return () => window.removeEventListener('token-expired', handleTokenExpired);
   }, [router, clearAuthData]);
 
   useEffect(() => {
     loadUser();
 
     const intervalId = setInterval(() => {
-      // Verifica se está em rota pública antes de fazer qualquer verificação
-      if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
-        console.log('[AuthContext] Em rota pública, pulando verificação de token');
-        return;
-      }
+      if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) return;
 
       const token = authService.getAccessToken();
-      
-      if (!token) {
-        console.log('[AuthContext] Token não encontrado no intervalo');
-        clearAuthData();
-        router.push('/login');
-        return;
-      }
-      
+      if (!token) { clearAuthData(); router.push('/login'); return; }
+
       const decoded = authService.decodeToken(token);
-      
-      if (!decoded) {
-        console.log('[AuthContext] Token inválido detectado no intervalo');
-        clearAuthData();
-        router.push('/login');
-        return;
-      }
+      if (!decoded) { clearAuthData(); router.push('/login'); return; }
 
       const now = Date.now() / 1000;
-      
       if (decoded.exp < now) {
-        console.log('[AuthContext] Token expirado detectado no intervalo');
-        
         const refreshToken = authService.getRefreshToken();
-        
         if (refreshToken) {
           authService.refreshToken({ refreshToken }).then(result => {
             if (result.success && result.data) {
-              console.log('[AuthContext] Token renovado automaticamente');
               httpClient.setAuthToken(result.data.accessToken);
-              
-              const maxAge = result.data.expiresIn || 3600;
-              document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
-            } else {
-              console.log('[AuthContext] Falha ao renovar token automaticamente');
-              clearAuthData();
-              router.push('/login');
-            }
-          }).catch(error => {
-            console.error('[AuthContext] Erro ao renovar token automaticamente:', error);
-            clearAuthData();
-            router.push('/login');
-          });
-        } else {
-          console.log('[AuthContext] Sem refresh token, fazendo logout');
-          clearAuthData();
-          router.push('/login');
-        }
-      }
-      else if ((decoded.exp - now) < 300) {
-        console.log('[AuthContext] Token próximo de expirar, renovando...');
-        
+              document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${result.data.expiresIn || 3600}; samesite=lax`;
+            } else { clearAuthData(); router.push('/login'); }
+          }).catch(() => { clearAuthData(); router.push('/login'); });
+        } else { clearAuthData(); router.push('/login'); }
+      } else if ((decoded.exp - now) < 300) {
         const refreshToken = authService.getRefreshToken();
-        
         if (refreshToken) {
           authService.refreshToken({ refreshToken }).then(result => {
             if (result.success && result.data) {
-              console.log('[AuthContext] Token renovado preventivamente');
               httpClient.setAuthToken(result.data.accessToken);
-              
-              const maxAge = result.data.expiresIn || 3600;
-              document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
+              document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${result.data.expiresIn || 3600}; samesite=lax`;
             }
-          }).catch(error => {
-            console.error('[AuthContext] Erro ao renovar token preventivamente:', error);
-          });
+          }).catch(() => { /* ignore */ });
         }
       }
     }, 60000);
@@ -287,158 +189,78 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => clearInterval(intervalId);
   }, [router, loadUser, clearAuthData]);
 
-  const login = async (email: string, senha: string, rememberMe: boolean = false): Promise<boolean> => {
+  const login = async (email: string, senha: string, rememberMe = false): Promise<boolean> => {
     try {
-      console.log('[AuthContext] Iniciando login para:', email);
-
-      const result = await authService.login({
-        email,
-        senha,
-        rememberMe
-      });
-
+      logger.log('[AuthContext] Iniciando login para:', email);
+      const result = await authService.login({ email, senha, rememberMe });
       if (result.success && result.data) {
-        console.log('[AuthContext] Login bem-sucedido');
-        
         httpClient.setAuthToken(result.data.accessToken);
-        
-        const maxAge = result.data.expiresIn || 3600;
-        document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${maxAge}; samesite=lax`;
-        
-        console.log('[AuthContext] Cookie salvo:', document.cookie.includes('auth-token') ? 'SIM' : 'NÃO');
-        
+        document.cookie = `auth-token=${result.data.accessToken}; path=/; max-age=${result.data.expiresIn || 3600}; samesite=lax`;
         setUser({
-          id: result.data.usuario.id,
-          nome: result.data.usuario.nome,
-          email: result.data.usuario.email,
-          tipo: result.data.usuario.tipo,
-          departamento: result.data.usuario.departamento,
-          telefone: result.data.usuario.telefone,
-          ultimoLogin: result.data.usuario.ultimoLogin
+          id: result.data.usuario.id, nome: result.data.usuario.nome, email: result.data.usuario.email,
+          tipo: result.data.usuario.tipo, departamento: result.data.usuario.departamento,
+          telefone: result.data.usuario.telefone, ultimoLogin: result.data.usuario.ultimoLogin,
         });
-
-        console.log('[AuthContext] Estado atualizado, retornando true');
         return true;
       }
-
-      console.log('[AuthContext] Login falhou:', result.message);
       return false;
     } catch (error: any) {
-      console.error('[AuthContext] Erro no login:', error);
+      logger.error('[AuthContext] Erro no login:', error);
       return false;
     }
   };
 
   const logout = async () => {
     try {
-      console.log('[AuthContext] Realizando logout');
-
       const refreshToken = authService.getRefreshToken();
-      
       if (refreshToken) {
-        try {
-          await authService.logout({ refreshToken });
-          console.log('[AuthContext] Logout no servidor realizado com sucesso');
-        } catch (error) {
-          console.error('[AuthContext] Erro ao fazer logout no servidor:', error);
-        }
+        try { await authService.logout({ refreshToken }); } catch { /* ignore */ }
       }
-    } catch (error) {
-      console.error('[AuthContext] Erro no logout:', error);
     } finally {
       clearAuthData();
-      console.log('[AuthContext] Dados locais limpos após logout');
       router.push('/login');
     }
   };
 
-  const refreshUser = async () => {
-    await loadUser();
-  };
+  const refreshUser = async () => { await loadUser(); };
 
   const logAction = (action: string, resource: string, details?: Record<string, any>) => {
     if (!user) return;
-
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      userId: user.id,
-      userName: user.nome,
-      userType: user.tipo,
-      action,
-      resource,
-      details: details || {}
-    };
-
-    console.log('[Audit]', logEntry);
-
+    const logEntry = { timestamp: new Date().toISOString(), userId: user.id, userName: user.nome, userType: user.tipo, action, resource, details: details || {} };
+    logger.log('[Audit]', logEntry);
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         const auditLogs = JSON.parse(localStorage.getItem('audit_logs') || '[]');
         auditLogs.push(logEntry);
-        
-        if (auditLogs.length > 1000) {
-          auditLogs.shift();
-        }
-        
+        if (auditLogs.length > 1000) auditLogs.shift();
         localStorage.setItem('audit_logs', JSON.stringify(auditLogs));
-      } catch (error) {
-        console.error('[Audit] Erro ao salvar log:', error);
-      }
+      } catch { /* ignore */ }
     }
   };
 
   const hasPermission = (resource: string, action: string): boolean => {
     if (!user) return false;
-    
     const userPermissions = user.tipo === 'ADMIN' ? PERMISSIONS.ADMIN : PERMISSIONS.USUARIO;
     const resourcePermissions = userPermissions[resource as keyof typeof userPermissions] || [];
-    
     return resourcePermissions.includes(action);
   };
 
-  const isAdmin = (): boolean => {
-    return user?.tipo === 'ADMIN';
-  };
-
-  const isUsuario = (): boolean => {
-    return user?.tipo === 'USUARIO';
-  };
+  const isAdmin = (): boolean => user?.tipo === 'ADMIN';
+  const isUsuario = (): boolean => user?.tipo === 'USUARIO';
 
   const getUserPermissions = (): string[] => {
     if (!user) return [];
-    
     const userPermissions = user.tipo === 'ADMIN' ? PERMISSIONS.ADMIN : PERMISSIONS.USUARIO;
     const allPermissions: string[] = [];
-    
     Object.entries(userPermissions).forEach(([resource, actions]) => {
-      actions.forEach(action => {
-        allPermissions.push(`${resource}:${action}`);
-      });
+      actions.forEach(action => allPermissions.push(`${resource}:${action}`));
     });
-    
     return allPermissions;
   };
 
-  const authValue: AuthContextType = {
-    user,
-    isAuthenticated,
-    isLoading,
-    login,
-    logout,
-    refreshUser,
-    logAction
-  };
-
-  const permissionsValue: PermissionsContextType = {
-    hasPermission,
-    isAdmin,
-    isUsuario,
-    getUserPermissions
-  };
-
   return (
-    <AuthContext.Provider value={authValue}>
-      <PermissionsContext.Provider value={permissionsValue}>
+    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, logout, refreshUser, logAction }}>
+      <PermissionsContext.Provider value={{ hasPermission, isAdmin, isUsuario, getUserPermissions }}>
         {children}
       </PermissionsContext.Provider>
     </AuthContext.Provider>
@@ -447,16 +269,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   return context;
 }
 
 export function usePermissions(): PermissionsContextType {
   const context = useContext(PermissionsContext);
-  if (context === undefined) {
-    throw new Error('usePermissions deve ser usado dentro de um AuthProvider');
-  }
+  if (context === undefined) throw new Error('usePermissions deve ser usado dentro de um AuthProvider');
   return context;
 }
