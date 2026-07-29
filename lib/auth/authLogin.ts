@@ -1,14 +1,10 @@
-
-export const loginFicticio = async (email: string, senha: string): Promise<{ success: boolean; message?: string }> => {
-    if (!email || !senha) {
-      return { success: false, message: 'Preencha todos os campos.' };
-    }
-  
-    if (email === 'email@gmail.com' && senha === '123') {
-      document.cookie = `token=fake-token; path=/;`;
-      return { success: true };
-    }
-  
-    return { success: false, message: 'Usuário ou senha inválidos.' };
-  };
-  
+// Arquivo esvaziado de propósito.
+//
+// Continha `loginFicticio`, que autenticava com credencial fixa no código
+// (email@gmail.com / 123) e gravava um cookie de sessão falso. Não tinha nenhum
+// importador — era código morto —, mas é exatamente o padrão que, se algum dia
+// fosse ligado a uma tela, vira backdoor de autenticação em produção.
+//
+// Pode apagar este arquivo. Ele foi mantido vazio apenas para não quebrar um
+// import esquecido em branch/stash local.
+export {};

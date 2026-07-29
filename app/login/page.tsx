@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { ValidationEmailFormat as isValidEmail } from '@/lib/utils/validation';
+import { logger } from '@/lib/utils/logger';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -23,7 +24,7 @@ export default function LoginPage() {
   // Redirecionar se já estiver autenticado
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      console.log('[LoginPage] Usuário já autenticado, redirecionando...');
+      logger.log('[LoginPage] Usuário já autenticado, redirecionando...');
       router.replace('/dashboard/geral');
     }
   }, [isAuthenticated, authLoading, router]);
@@ -63,30 +64,24 @@ export default function LoginPage() {
     setError('');
 
     try {
-      console.log('[LoginPage] Iniciando processo de login...');
-
+      // Os console.log de depuração daqui imprimiam o JWT completo e document.cookie —
+      // em produção, direto para extensões, SDKs de session replay e compartilhamento
+      // de tela. Removidos; use o logger, que é silenciado fora de desenvolvimento.
       const success = await login(email, password, rememberMe);
 
       if (success) {
-        console.log('[DEBUG] isAuthenticated:', isAuthenticated);
-        console.log('[DEBUG] Cookies:', document.cookie);
-        console.log('[DEBUG] LocalStorage token:', localStorage.getItem('access-token'));
-
         // Aguardar um pouco para garantir que o estado foi atualizado
         await new Promise(resolve => setTimeout(resolve, 100));
-
-        console.log('[LoginPage] Redirecionando para dashboard...');
 
         // Usar replace para evitar voltar para login
         router.replace('/dashboard/geral');
 
       } else {
-        console.log('[LoginPage] Login falhou');
         setError('E-mail ou senha inválidos. Verifique suas credenciais.');
         setLoading(false);
       }
     } catch (error: any) {
-      console.error('[LoginPage] Erro no login:', error);
+      logger.error('[LoginPage] Erro no login:', error);
       setError('Erro ao conectar com o servidor. Tente novamente.');
       setLoading(false);
     }

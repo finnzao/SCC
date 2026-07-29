@@ -730,7 +730,7 @@ export interface RelatorioUltimosMeses {
 export interface TendenciaMensal {
   mes: string;
   mesNome: string;
-  totalCustodiados: number;
+  totalCustodiados?: number;
   emConformidade: number;
   inadimplentes: number;
   taxaConformidade: number;

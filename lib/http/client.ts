@@ -71,14 +71,15 @@ class HttpClient {
     this.onUnauthorized = handler;
   }
 
+  /**
+   * O token agora vive num cookie httpOnly — ilegível para o JavaScript, e é esse o ponto:
+   * um XSS não consegue mais exfiltrá-lo. Como não dá para checá-lo daqui, o sinal de
+   * "há sessão" passa a ser o perfil do usuário, que não é credencial. Se alguém forjar
+   * esse valor no localStorage, não ganha nada: quem decide é o backend, que responde 401.
+   */
   private isAuthenticated(): boolean {
     if (typeof window === 'undefined') return false;
-    return !!localStorage.getItem('access-token');
-  }
-
-  private getToken(): string | null {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('access-token');
+    return !!localStorage.getItem('user-data');
   }
 
   private isPublicRoute(endpoint: string): boolean {
@@ -107,10 +108,12 @@ class HttpClient {
     logger.log('[HttpClient] Limpando dados de autenticação');
     this.clearAuthToken();
     if (typeof window !== 'undefined') {
+      // Os cookies httpOnly são apagados pelo backend no /auth/logout — JS não os alcança.
+      // As remoções abaixo limpam resíduo de quem logou antes da migração para cookie.
       localStorage.removeItem('access-token');
       localStorage.removeItem('refresh-token');
+      localStorage.removeItem('api_auth_token');
       localStorage.removeItem('user-data');
-      document.cookie = 'auth-token=; path=/; max-age=0';
     }
   }
 
@@ -125,46 +128,29 @@ class HttpClient {
     if (this.isRefreshing) {
       return new Promise((resolve, reject) => {
         this.failedQueue.push({ resolve, reject });
-      }).then(token => {
-        originalConfig.headers = { ...originalConfig.headers, Authorization: `Bearer ${token}` };
+      }).then(() => {
+        // Nada a reinjetar: o cookie renovado já acompanha a nova requisição.
         return this.makeRequest(endpoint, originalConfig);
       }).catch(err => Promise.reject(err));
     }
 
     this.isRefreshing = true;
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh-token') : null;
-
-    if (!refreshToken) {
-      logger.log('[HttpClient] Sem refresh token disponível');
-      this.isRefreshing = false;
-      this.clearAuthData();
-      this.onUnauthorized?.();
-      return Promise.reject(new Error('Não autenticado'));
-    }
 
     try {
       logger.log('[HttpClient] Tentando renovar token...');
+      // Sem corpo: o refresh token é um cookie httpOnly restrito a /api/auth.
       const response = await fetch(`${this.baseURL}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        credentials: 'include',
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.data) {
-          const { accessToken, refreshToken: newRefreshToken, expiresIn } = data.data;
+        if (data.success !== false) {
           logger.log('[HttpClient] Token renovado com sucesso');
-
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('access-token', accessToken);
-            localStorage.setItem('refresh-token', newRefreshToken);
-            document.cookie = `auth-token=${accessToken}; path=/; max-age=${expiresIn || 3600}; samesite=lax`;
-          }
-
-          this.setAuthToken(accessToken);
-          originalConfig.headers = { ...originalConfig.headers, Authorization: `Bearer ${accessToken}` };
-          this.processQueue(null, accessToken);
+          // Os novos cookies já vieram no Set-Cookie da resposta: nada a guardar aqui.
+          this.processQueue(null, null);
           this.isRefreshing = false;
           return this.makeRequest(endpoint, originalConfig);
         }
@@ -223,12 +209,7 @@ class HttpClient {
       return { success: false, status: 401, error: 'Usuário não autenticado', timestamp: new Date().toISOString() };
     }
 
-    if (!isPublic && requireAuth) {
-      const token = this.getToken();
-      if (token && !headers['Authorization']) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-    }
+    // Sem header Authorization: o cookie httpOnly viaja sozinho (mesma origem via rewrite).
 
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
     const requestHeaders = { ...this.defaultHeaders, ...headers };
@@ -242,6 +223,7 @@ class HttpClient {
       method,
       headers: requestHeaders,
       signal: controller.signal,
+      credentials: 'include', // envia o cookie de sessão httpOnly
     };
 
     if (body && method !== 'GET') {

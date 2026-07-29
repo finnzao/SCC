@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
-import { testService, initializeBackendApi, configureAuthHeaders } from '@/lib/api/services';
+import { testService, initializeBackendApi } from '@/lib/api/services';
 import { HealthResponse, AppInfoResponse } from '@/types/api';
 import { logger } from '@/lib/utils/logger';
 
@@ -114,15 +114,15 @@ export function ApiProvider({
     return checkConnection();
   }, [checkConnection, clearCache]);
 
-  const setAuthToken = useCallback((token: string) => {
-    logger.log('[ApiProvider] Configurando token de autenticação');
-    configureAuthHeaders(token);
-    if (typeof window !== 'undefined') localStorage.setItem('api_auth_token', token);
+  // Esta era a terceira cópia do token no browser (além de access-token e do cookie
+  // legível). Virou no-op: a sessão viaja no cookie httpOnly.
+  const setAuthToken = useCallback((_token: string) => {
+    logger.log('[ApiProvider] Token ignorado: sessão via cookie httpOnly');
   }, []);
 
   const clearAuthFn = useCallback(() => {
     logger.log('[ApiProvider] Removendo autenticação');
-    if (typeof window !== 'undefined') localStorage.removeItem('api_auth_token');
+    if (typeof window !== 'undefined') localStorage.removeItem('api_auth_token'); // resíduo pré-migração
     clearCache();
   }, [clearCache]);
 
@@ -130,8 +130,7 @@ export function ApiProvider({
     if (isInitializedRef.current) return;
     initializeBackendApi();
     if (typeof window !== 'undefined') {
-      const savedToken = localStorage.getItem('api_auth_token');
-      if (savedToken) configureAuthHeaders(savedToken);
+      localStorage.removeItem('api_auth_token'); // limpa resíduo de sessões pré-cookie
     }
     isInitializedRef.current = true;
     if (autoCheck) {

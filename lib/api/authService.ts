@@ -135,11 +135,10 @@ class AuthService {
         return { success: false, message: 'Resposta incompleta do servidor' };
       }
 
-      logger.log('[AuthService] Login bem-sucedido, salvando tokens');
-      this.setAccessToken(loginData.accessToken);
-      this.setRefreshToken(loginData.refreshToken);
+      // Os tokens vieram como cookies httpOnly no Set-Cookie da resposta; o corpo ainda os
+      // traz por retrocompatibilidade, mas não guardamos nada disso em JS.
+      logger.log('[AuthService] Login bem-sucedido');
       this.setUserData(loginData.usuario);
-      httpClient.setAuthToken(loginData.accessToken);
 
       return { success: true, data: loginData };
     } catch (error: any) {
@@ -156,17 +155,10 @@ class AuthService {
       if (!isSuccessResponse(response)) return { success: false };
 
       const refreshData = extractResponseData<RefreshTokenResponseData>(response);
-      if (!refreshData || !refreshData.accessToken || !refreshData.refreshToken) {
-        logger.error('[AuthService] Dados de refresh inválidos');
-        return { success: false };
-      }
 
+      // Sucesso é o 2xx: os cookies renovados já vieram no Set-Cookie da resposta.
       logger.log('[AuthService] Token renovado com sucesso');
-      this.setAccessToken(refreshData.accessToken);
-      this.setRefreshToken(refreshData.refreshToken);
-      httpClient.setAuthToken(refreshData.accessToken);
-
-      return { success: true, data: refreshData };
+      return { success: true, data: refreshData ?? undefined };
     } catch (error) {
       logger.error('[AuthService] Erro ao renovar token:', error);
       return { success: false };
@@ -242,22 +234,26 @@ class AuthService {
     }
   }
 
-  setAccessToken(token: string): void {
-    if (typeof window !== 'undefined') localStorage.setItem(this.ACCESS_TOKEN_KEY, token);
+  /**
+   * Os tokens deixaram de existir no JavaScript: vivem em cookies httpOnly emitidos pelo
+   * backend, que o script da página não consegue ler nem gravar. Estes métodos viraram
+   * no-op/null de propósito — mantidos para não quebrar quem os chama, mas guardar o token
+   * de novo em localStorage reabriria o roubo por XSS que esta mudança fechou.
+   */
+  setAccessToken(_token: string): void {
+    /* no-op: o cookie httpOnly é a única fonte do token */
   }
 
   getAccessToken(): string | null {
-    if (typeof window !== 'undefined') return localStorage.getItem(this.ACCESS_TOKEN_KEY);
-    return null;
+    return null; // inacessível ao JS por design
   }
 
-  setRefreshToken(token: string): void {
-    if (typeof window !== 'undefined') localStorage.setItem(this.REFRESH_TOKEN_KEY, token);
+  setRefreshToken(_token: string): void {
+    /* no-op: cookie httpOnly restrito a /api/auth */
   }
 
   getRefreshToken(): string | null {
-    if (typeof window !== 'undefined') return localStorage.getItem(this.REFRESH_TOKEN_KEY);
-    return null;
+    return null; // inacessível ao JS por design
   }
 
   setUserData(usuario: any): void {
@@ -282,14 +278,17 @@ class AuthService {
     httpClient.clearAuthToken();
   }
 
+  /**
+   * Presença de sessão, não prova de sessão: o token httpOnly não é legível daqui.
+   * Serve só para decidir o que renderizar — a autorização real é do backend.
+   */
   isAuthenticated(): boolean {
-    return !!this.getAccessToken();
+    return !!this.getUserData();
   }
 
-  isAdmin(): boolean {
-    const user = this.getUserData();
-    return user?.tipo === 'ADMIN';
-  }
+  // isAdmin() foi removido: lia `tipo` do localStorage, que o próprio usuário edita
+  // (localStorage.setItem('user-data', '{"tipo":"ADMIN"}') e virava admin). Para decisão
+  // de UI use o `user` do AuthContext, que vem de GET /auth/perfil.
 
   decodeToken(token: string): TokenPayload | null {
     try {
@@ -305,22 +304,9 @@ class AuthService {
     }
   }
 
-  isTokenExpiring(minutesThreshold: number = 5): boolean {
-    const token = this.getAccessToken();
-    if (!token) return true;
-    const decoded = this.decodeToken(token);
-    if (!decoded) return true;
-    const minutesUntilExpiry = (decoded.exp - Date.now() / 1000) / 60;
-    return minutesUntilExpiry <= minutesThreshold;
-  }
-
-  getTokenExpirationTime(): Date | null {
-    const token = this.getAccessToken();
-    if (!token) return null;
-    const decoded = this.decodeToken(token);
-    if (!decoded) return null;
-    return new Date(decoded.exp * 1000);
-  }
+  // isTokenExpiring()/getTokenExpirationTime() foram removidos: dependiam de ler o token
+  // no JS. A expiração agora é tratada onde ela de fato importa — o backend responde 401
+  // e o httpClient renova via cookie de refresh automaticamente.
 }
 
 export const authService = new AuthService();

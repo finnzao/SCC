@@ -22,7 +22,58 @@ function isStaticAsset(pathname: string): boolean {
   return false;
 }
 
-export function middleware(req: NextRequest) {
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+function base64UrlParaBytes(input: string): Uint8Array {
+  const b64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  const comPadding = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '=');
+  const binario = atob(comPadding);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}
+
+/**
+ * Verifica assinatura HS256 + expiração. Antes daqui só se checava se o cookie EXISTIA,
+ * então `document.cookie='auth-token=x'` no console já liberava o /dashboard.
+ *
+ * O algoritmo é fixado em HS256 e o campo `alg` do cabeçalho NUNCA é usado para escolher
+ * a verificação — é assim que se evita algorithm confusion (`alg: none`, troca HS/RS).
+ * Web Crypto é nativo no runtime Edge: nenhuma dependência nova.
+ */
+async function tokenValido(token: string, secret: string): Promise<boolean> {
+  const partes = token.split('.');
+  if (partes.length !== 3) return false;
+  const [cabecalho, payload, assinatura] = partes;
+
+  try {
+    if (JSON.parse(decoder.decode(base64UrlParaBytes(cabecalho)))?.alg !== 'HS256') return false;
+
+    const chave = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
+
+    const assinaturaConfere = await crypto.subtle.verify(
+      'HMAC',
+      chave,
+      base64UrlParaBytes(assinatura),
+      encoder.encode(`${cabecalho}.${payload}`),
+    );
+    if (!assinaturaConfere) return false;
+
+    const { exp } = JSON.parse(decoder.decode(base64UrlParaBytes(payload)));
+    return typeof exp === 'number' && exp * 1000 > Date.now();
+  } catch {
+    return false; // token malformado é token inválido
+  }
+}
+
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (isStaticAsset(pathname) || isPublicRoute(pathname)) {
@@ -31,7 +82,17 @@ export function middleware(req: NextRequest) {
 
   if (pathname.startsWith('/dashboard')) {
     const token = req.cookies.get('auth-token')?.value;
-    if (!token) {
+    if (!token) return NextResponse.redirect(new URL('/login', req.url));
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      // Fail-closed de propósito: sem o segredo não há o que verificar, e degradar para
+      // "deixa passar" recriaria em silêncio exatamente a falha que este arquivo corrige.
+      console.error('[middleware] JWT_SECRET não configurado — /dashboard bloqueado.');
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+
+    if (!(await tokenValido(token, secret))) {
       return NextResponse.redirect(new URL('/login', req.url));
     }
   }
