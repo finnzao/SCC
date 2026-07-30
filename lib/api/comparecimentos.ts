@@ -5,7 +5,7 @@ import { RegistroComparecimentoCompleto, AtualizacaoEndereco } from '@/types/com
 
 // Constantes e mensagens
 const API_ENDPOINTS = {
-    BASE: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+    BASE: process.env.NEXT_PUBLIC_API_URL || '/api'
   } as const;
   
   const MESSAGES = {

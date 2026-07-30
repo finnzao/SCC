@@ -54,7 +54,10 @@ class HttpClient {
   ];
 
   constructor(config?: ClientConfig) {
-    this.baseURL = config?.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+    // Same-origin: o browser fala com /api do próprio site e o rewrite do Next
+    // (next.config.ts) repassa para BACKEND_URL. Chamar o backend direto daqui
+    // esbarraria em connect-src 'self' na CSP.
+    this.baseURL = config?.baseURL || process.env.NEXT_PUBLIC_API_URL || '/api';
     this.defaultHeaders = {
       'Content-Type': 'application/json',
       Accept: 'application/json',

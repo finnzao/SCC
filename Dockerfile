@@ -18,13 +18,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Argumentos de build - precisam ser declarados ANTES de serem usados
-ARG NEXT_PUBLIC_API_URL=http://localhost/api
-ARG NEXT_PUBLIC_BACKEND_URL=http://localhost/api
+# O browser sempre fala com /api (mesma origem). BACKEND_URL é o destino real do
+# rewrite e fica só no servidor — precisa existir no BUILD porque rewrites() é
+# avaliado em build time e gravado no routes-manifest.
+ARG NEXT_PUBLIC_API_URL=/api
+ARG BACKEND_URL=http://localhost:8080
 
 # Definir variáveis de ambiente ANTES do build
 # NEXT_PUBLIC_* são embutidas no bundle durante o build, não em runtime
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
+ENV BACKEND_URL=$BACKEND_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
