@@ -31,6 +31,18 @@ import {
 } from 'lucide-react';
 import { extractDateFromTimestamp } from '@/lib/utils/dateutils';
 
+/**
+ * Mesma política do backend (PoliticaSenha.REGEX): 8+ caracteres com minúscula,
+ * maiúscula, dígito e um caractere não alfanumérico. Os requisitos já eram exibidos
+ * na tela, mas nada impedia o envio — a senha fraca só era recusada pelo servidor.
+ */
+const senhaAtendePolitica = (senha: string): boolean =>
+  senha.length >= 8 &&
+  /[a-z]/.test(senha) &&
+  /[A-Z]/.test(senha) &&
+  /[0-9]/.test(senha) &&
+  /[^a-zA-Z0-9]/.test(senha);
+
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   const calculateStrength = () => {
     let strength = 0;
@@ -618,9 +630,10 @@ export default function ConfiguracoesPage() {
               <button 
                 onClick={handleAlterarSenha}
                 disabled={
-                  loading || 
-                  !senhaAtual || 
-                  !novaSenha || 
+                  loading ||
+                  !senhaAtual ||
+                  !novaSenha ||
+                  !senhaAtendePolitica(novaSenha) ||
                   novaSenha !== confirmarSenha ||
                   novaSenha === senhaAtual
                 }
