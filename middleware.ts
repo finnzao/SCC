@@ -25,11 +25,22 @@ function isStaticAsset(pathname: string): boolean {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-function base64UrlParaBytes(input: string): Uint8Array {
+/**
+ * Decodifica uma string base64url para bytes.
+ *
+ * O retorno é tipado explicitamente como `Uint8Array<ArrayBuffer>` (e não o
+ * `Uint8Array<ArrayBufferLike>` inferido por `new Uint8Array(length)`) porque
+ * a Web Crypto API (`crypto.subtle.verify`, `.digest`, etc.) exige `BufferSource`
+ * apoiado em `ArrayBuffer` — `SharedArrayBuffer` não é um `ArrayBuffer` válido
+ * para essas chamadas. Alocar via `new ArrayBuffer(n)` e envolver com `Uint8Array`
+ * garante esse tipo na origem, sem casts espalhados pelos pontos de uso.
+ */
+function base64UrlParaBytes(input: string): Uint8Array<ArrayBuffer> {
   const b64 = input.replace(/-/g, '+').replace(/_/g, '/');
   const comPadding = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '=');
   const binario = atob(comPadding);
-  const bytes = new Uint8Array(binario.length);
+  const buffer = new ArrayBuffer(binario.length);
+  const bytes = new Uint8Array(buffer);
   for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
   return bytes;
 }
