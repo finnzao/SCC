@@ -80,6 +80,7 @@ interface CadastroInicialForm {
   contato: string;
   cpf: string;
   rg: string;
+  naturezaVinculo: 'CAUTELAR' | 'EXECUCAO_REGIME_ABERTO';
   processo: string;
   vara: string;
   comarca: string;
@@ -153,6 +154,7 @@ function RegistrarPage() {
 
   const [formData, setFormData] = useState<CadastroInicialForm>({
     nome: '', contato: '', cpf: '', rg: '',
+    naturezaVinculo: 'CAUTELAR',
     processo: '', vara: '', comarca: '',
     dataDecisao: '', dataComparecimentoInicial: '',
     periodicidade: 30,
@@ -304,6 +306,7 @@ function RegistrarPage() {
     try {
       const body: Record<string, any> = {
         nome: formData.nome.trim(),
+        naturezaVinculo: formData.naturezaVinculo,
         processo: formData.processo.trim(),
         vara: formData.vara.trim(),
         comarca: formData.comarca.trim(),
@@ -459,6 +462,25 @@ function RegistrarPage() {
         <div className="bg-white rounded-xl shadow-sm p-6">
           <SectionHeader icon={Calendar} title="Dados Processuais" number={3} />
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Acompanhamento <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-pointer transition-colors ${formData.naturezaVinculo === 'CAUTELAR' ? 'border-primary bg-blue-50 ring-1 ring-primary' : 'border-gray-300 hover:bg-gray-50'}`}>
+                  <input type="radio" name="naturezaVinculo" checked={formData.naturezaVinculo === 'CAUTELAR'} onChange={() => handleInputChange('naturezaVinculo', 'CAUTELAR')} disabled={isSubmitting} className="accent-blue-600" />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-800">Medida Cautelar</span>
+                    <span className="block text-xs text-gray-500">CPP art. 319, IV</span>
+                  </span>
+                </label>
+                <label className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-pointer transition-colors ${formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO' ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-500' : 'border-gray-300 hover:bg-gray-50'}`}>
+                  <input type="radio" name="naturezaVinculo" checked={formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO'} onChange={() => handleInputChange('naturezaVinculo', 'EXECUCAO_REGIME_ABERTO')} disabled={isSubmitting} className="accent-purple-600" />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-800">Cumprimento de Pena</span>
+                    <span className="block text-xs text-gray-500">Regime aberto — LEP arts. 113-119</span>
+                  </span>
+                </label>
+              </div>
+            </div>
             <MaskedInputField mask="processo" label="Número do Processo (CNJ)" required value={formData.processo} onChange={(v) => handleInputChange('processo', v)} errorMessage={errors.processo} helperText="Formato: 0000000-00.0000.0.00.0000" disabled={isSubmitting} showCounter />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

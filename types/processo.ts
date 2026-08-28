@@ -2,6 +2,7 @@
 
 export type SituacaoProcesso = 'ATIVO' | 'ENCERRADO' | 'SUSPENSO';
 export type StatusComparecimento = 'EM_CONFORMIDADE' | 'INADIMPLENTE';
+export type NaturezaVinculo = 'CAUTELAR' | 'EXECUCAO_REGIME_ABERTO';
 
 /**
  * Processo retornado pela API GET /api/processos
@@ -22,6 +23,8 @@ export interface Processo {
   ultimoComparecimento: string | null;
   proximoComparecimento: string | null;
   situacaoProcesso: SituacaoProcesso;
+  naturezaVinculo: NaturezaVinculo;
+  naturezaVinculoDescricao: string;
   observacoes: string | null;
   criadoEm: string;
   atualizadoEm: string | null;
@@ -43,6 +46,7 @@ export interface ProcessoDTO {
   periodicidade: number;
   dataComparecimentoInicial: string;
   observacoes?: string;
+  naturezaVinculo?: NaturezaVinculo; // ausente = CAUTELAR
 }
 
 /**
@@ -83,6 +87,14 @@ export const SITUACAO_PROCESSO_CONFIG: Record<SituacaoProcesso, { label: string;
   ATIVO: { label: 'Ativo', color: 'text-green-800', bgColor: 'bg-green-100' },
   ENCERRADO: { label: 'Encerrado', color: 'text-gray-800', bgColor: 'bg-gray-100' },
   SUSPENSO: { label: 'Suspenso', color: 'text-yellow-800', bgColor: 'bg-yellow-100' },
+};
+
+/**
+ * Badge configs para natureza do vínculo
+ */
+export const NATUREZA_VINCULO_CONFIG: Record<NaturezaVinculo, { label: string; color: string; bgColor: string }> = {
+  CAUTELAR: { label: 'Cautelar', color: 'text-blue-800', bgColor: 'bg-blue-100' },
+  EXECUCAO_REGIME_ABERTO: { label: 'Cumprimento de Pena', color: 'text-purple-800', bgColor: 'bg-purple-100' },
 };
 
 /**

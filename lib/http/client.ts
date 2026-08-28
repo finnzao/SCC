@@ -3,6 +3,28 @@
 
 import { logger } from '@/lib/utils/logger';
 
+/**
+ * Lê um cookie legível pelo JS. Usado só para o token CSRF (XSRF-TOKEN), que é
+ * emitido deliberadamente sem httpOnly — o cookie de sessão continua httpOnly e
+ * segue inacessível aqui.
+ *
+ * Exportada para teste: a extração por nome erra fácil quando um cookie é prefixo
+ * de outro (XSRF-TOKEN vs XSRF-TOKEN-OLD) ou quando o valor tem '='.
+ */
+export function readCookie(nome: string): string | null {
+  if (typeof document === 'undefined') return null; // SSR: não há document
+
+  for (const parte of document.cookie.split(';')) {
+    const bruto = parte.trim();
+    const separador = bruto.indexOf('=');
+    if (separador === -1) continue;
+    if (bruto.slice(0, separador) !== nome) continue;
+    // Só o primeiro '=' separa nome de valor; o resto pertence ao valor.
+    return decodeURIComponent(bruto.slice(separador + 1));
+  }
+  return null;
+}
+
 export interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
@@ -212,17 +234,24 @@ class HttpClient {
     // Sem header Authorization: o cookie httpOnly viaja sozinho (mesma origem via rewrite).
 
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
-    const requestHeaders = { ...this.defaultHeaders, ...headers };
+    const requestHeaders: Record<string, string> = { ...this.defaultHeaders, ...headers };
+
+    // Double-submit de CSRF: o backend emite o token no cookie XSRF-TOKEN (sem
+    // httpOnly, justamente para ser lido aqui) e exige o mesmo valor no header.
+    // Só em métodos mutáveis. HEAD e OPTIONS também são isentos no Spring Security,
+    // mas RequestConfig não os aceita — comparar com eles seria código morto.
+    if (method !== 'GET') {
+      const csrfToken = readCookie('XSRF-TOKEN');
+      if (csrfToken) {
+        requestHeaders['X-XSRF-TOKEN'] = csrfToken;
+      }
+    }
 
     logger.log(`[HttpClient] ${method} ${url}`);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     const requestConfig: RequestInit = {
       method,
       headers: requestHeaders,
-      signal: controller.signal,
       credentials: 'include', // envia o cookie de sessão httpOnly
     };
 
@@ -239,9 +268,15 @@ class HttpClient {
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
+      // BUG CORRIGIDO: o AbortController era criado UMA vez, fora do laço. Quando o timeout
+      // disparava, o sinal ficava abortado para sempre — as tentativas seguintes falhavam
+      // instantaneamente com "signal is aborted without reason", mascarando o erro original
+      // (foi exatamente o que apareceu no login em produção). Um controller por tentativa.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
       try {
-        const response = await fetch(url, requestConfig);
-        clearTimeout(timeoutId);
+        const response = await fetch(url, { ...requestConfig, signal: controller.signal });
 
         if (response.status === 401 && requireAuth && !isPublic) {
           logger.warn('[HttpClient] Token expirado ou inválido (401)');
@@ -281,13 +316,14 @@ class HttpClient {
 
         return apiResponse;
       } catch (error) {
-        clearTimeout(timeoutId);
         lastError = error as Error;
         if (attempt < retries) {
           logger.log(`[HttpClient] Tentativa ${attempt + 1} falhou, tentando novamente...`);
           await this.delay(1000 * Math.pow(2, attempt));
           continue;
         }
+      } finally {
+        clearTimeout(timeoutId); // vale para os caminhos de return, continue e throw
       }
     }
 

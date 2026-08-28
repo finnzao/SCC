@@ -1,0 +1,22 @@
+# Sem este arquivo, o "COPY . ." do Dockerfile copia node_modules e .next da máquina
+# local para dentro da imagem — build lento e, pior, binários compilados para outro
+# sistema operacional sobrescrevendo os que o "npm ci" instalou no container.
+node_modules
+.next
+out
+build
+
+# Nunca entram na imagem: segredos vêm das variáveis de ambiente do Render.
+.env
+.env.*
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+npm-debug.log*
+.DS_Store
+coverage
+.vscode
+.idea

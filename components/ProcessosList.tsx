@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileText, Plus, Calendar, UserCheck, Loader2, AlertTriangle } from 'lucide-react';
 import { useProcessos } from '@/hooks/useProcessos';
-import { SituacaoBadge, StatusBadge } from '@/components/SituacaoBadge';
+import { NaturezaBadge, SituacaoBadge, StatusBadge } from '@/components/SituacaoBadge';
 import ProcessoActions from '@/components/ProcessoActions';
 import ProcessoForm from '@/components/ProcessoForm';
 import { formatToBrazilianDate } from '@/lib/utils/dateutils';
@@ -111,6 +111,7 @@ export default function ProcessosList({ custodiadoId, custodiadoNome }: Processo
                     <span className="font-mono text-sm font-medium text-gray-800">
                       {processo.numeroProcesso}
                     </span>
+                    <NaturezaBadge natureza={processo.naturezaVinculo} />
                     <SituacaoBadge situacao={processo.situacaoProcesso} />
                     <StatusBadge status={processo.status} />
                   </div>

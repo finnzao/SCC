@@ -16,11 +16,23 @@ interface Usuario {
   ultimoLogin?: string;
 }
 
+export interface LoginResult {
+  success: boolean;
+  /** Mensagem do servidor quando houver — ex.: excesso de tentativas (429). */
+  message?: string;
+}
+
 interface AuthContextType {
   user: Usuario | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, senha: string, rememberMe?: boolean) => Promise<boolean>;
+  /**
+   * Retorna o motivo da falha, não só um booleano. O backend distingue credencial
+   * inválida (401) de excesso de tentativas (429), e a tela precisa dizer qual foi:
+   * mostrar "verifique suas credenciais" para quem está bloqueado faz a pessoa
+   * insistir e prolongar o bloqueio.
+   */
+  login: (email: string, senha: string, rememberMe?: boolean) => Promise<LoginResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   logAction: (action: string, resource: string, details?: Record<string, any>) => void;
@@ -115,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, [loadUser]);
 
-  const login = async (email: string, senha: string, rememberMe = false): Promise<boolean> => {
+  const login = async (email: string, senha: string, rememberMe = false): Promise<LoginResult> => {
     try {
       logger.log('[AuthContext] Iniciando login para:', email);
       const result = await authService.login({ email, senha, rememberMe });
@@ -126,12 +138,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           tipo: result.data.usuario.tipo, departamento: result.data.usuario.departamento,
           telefone: result.data.usuario.telefone, ultimoLogin: result.data.usuario.ultimoLogin,
         });
-        return true;
+        return { success: true };
       }
-      return false;
+      // A mensagem vem do backend e é segura de exibir: em falha de credencial ele
+      // devolve texto constante ("Credenciais inválidas") justamente para não virar
+      // oráculo de enumeração de contas.
+      return { success: false, message: result.message };
     } catch (error: any) {
       logger.error('[AuthContext] Erro no login:', error);
-      return false;
+      return { success: false };
     }
   };
 

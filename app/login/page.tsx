@@ -67,9 +67,9 @@ export default function LoginPage() {
       // Os console.log de depuração daqui imprimiam o JWT completo e document.cookie —
       // em produção, direto para extensões, SDKs de session replay e compartilhamento
       // de tela. Removidos; use o logger, que é silenciado fora de desenvolvimento.
-      const success = await login(email, password, rememberMe);
+      const result = await login(email, password, rememberMe);
 
-      if (success) {
+      if (result.success) {
         // Aguardar um pouco para garantir que o estado foi atualizado
         await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -77,7 +77,10 @@ export default function LoginPage() {
         router.replace('/dashboard/geral');
 
       } else {
-        setError('E-mail ou senha inválidos. Verifique suas credenciais.');
+        // Mensagem do servidor quando houver: em excesso de tentativas (429) ele
+        // responde "Muitas tentativas. Aguarde...". Mostrar "verifique suas
+        // credenciais" nesse caso faz a pessoa tentar de novo e prolongar o bloqueio.
+        setError(result.message || 'E-mail ou senha inválidos. Verifique suas credenciais.');
         setLoading(false);
       }
     } catch (error: any) {

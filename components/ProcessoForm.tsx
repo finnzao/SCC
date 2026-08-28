@@ -41,6 +41,7 @@ export default function ProcessoForm({ custodiadoId, custodiadoNome, onClose, on
 
   const [form, setForm] = useState<ProcessoDTO>({
     custodiadoId: custodiadoId || 0,
+    naturezaVinculo: 'CAUTELAR',
     numeroProcesso: '',
     vara: '',
     comarca: '',
@@ -191,6 +192,22 @@ export default function ProcessoForm({ custodiadoId, custodiadoNome, onClose, on
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Tipo de Acompanhamento */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Acompanhamento <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.naturezaVinculo || 'CAUTELAR'}
+              onChange={e => handleChange('naturezaVinculo', e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              disabled={loading}
+            >
+              <option value="CAUTELAR">Medida Cautelar (CPP art. 319, IV)</option>
+              <option value="EXECUCAO_REGIME_ABERTO">Cumprimento de Pena — Regime Aberto (LEP arts. 113-119)</option>
+            </select>
+          </div>
+
           {/* Número do Processo */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

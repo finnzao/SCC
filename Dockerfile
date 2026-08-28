@@ -18,13 +18,21 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Argumentos de build - precisam ser declarados ANTES de serem usados
-ARG NEXT_PUBLIC_API_URL=http://localhost/api
-ARG NEXT_PUBLIC_BACKEND_URL=http://localhost/api
+#
+# NEXT_PUBLIC_API_URL fica RELATIVA: o browser chama a própria origem e o rewrite do
+# next.config.ts encaminha para o backend. É isso que mantém o cookie httpOnly no
+# domínio do frontend e visível para o middleware.
+ARG NEXT_PUBLIC_API_URL=/api
+
+# BACKEND_URL é lido pelo rewrite. Passado TAMBÉM como build arg porque o Next resolve
+# rewrites() ao gerar o routes-manifest, durante o build — definir só em runtime pode
+# não surtir efeito. Continue definindo nas duas pontas (build e runtime) por segurança.
+ARG BACKEND_URL=http://localhost:8080
 
 # Definir variáveis de ambiente ANTES do build
 # NEXT_PUBLIC_* são embutidas no bundle durante o build, não em runtime
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
+ENV BACKEND_URL=$BACKEND_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
@@ -59,8 +67,13 @@ USER nextjs
 # Expor porta
 EXPOSE 3000
 
+# O Render injeta PORT em runtime e sobrescreve este default — não fixe a porta lá.
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+# Runtime (definidos no painel do Render, não aqui):
+#   BACKEND_URL  -> destino do proxy, ex.: https://aclp-back.onrender.com
+#   JWT_SECRET   -> o MESMO do backend; sem ele o middleware bloqueia /dashboard
 
 # Comando para executar a aplicação
 CMD ["node", "server.js"]
