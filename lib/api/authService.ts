@@ -247,7 +247,7 @@ class AuthService {
   getAccessToken(): string | null {
     return null; // inacessível ao JS por design
   }
-
+  // eslint-disable-next-line no-unused-vars
   setRefreshToken(_token: string): void {
     /* no-op: cookie httpOnly restrito a /api/auth */
   }

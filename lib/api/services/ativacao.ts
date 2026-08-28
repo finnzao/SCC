@@ -151,10 +151,14 @@ export const ativacaoService = {
         };
       }
 
-      if (data.senha.length < 8) {
+      // Política completa, não só tamanho: o backend recusa senha sem maiúscula,
+      // minúscula, número ou caractere especial, e sem isto o usuário só descobriria
+      // no erro do servidor.
+      const forcaSenha = validarForcaSenha(data.senha);
+      if (!forcaSenha.valida) {
         return {
           success: false,
-          message: 'A senha deve ter pelo menos 8 caracteres'
+          message: `A senha não atende aos requisitos: ${forcaSenha.problemas.join(', ')}`
         };
       }
 
@@ -409,7 +413,9 @@ export function validarForcaSenha(senha: string): {
     pontos++;
   }
 
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(senha)) {
+  // Qualquer caractere não alfanumérico serve, igual ao backend. A lista fechada
+  // anterior reprovava símbolos válidos como '_' e '-'.
+  if (!/[^a-zA-Z0-9]/.test(senha)) {
     problemas.push('Pelo menos um caractere especial');
   } else {
     pontos++;

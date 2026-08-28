@@ -18,15 +18,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Argumentos de build - precisam ser declarados ANTES de serem usados
-#
-# NEXT_PUBLIC_API_URL fica RELATIVA: o browser chama a própria origem e o rewrite do
-# next.config.ts encaminha para o backend. É isso que mantém o cookie httpOnly no
-# domínio do frontend e visível para o middleware.
+# O browser sempre fala com /api (mesma origem). BACKEND_URL é o destino real do
+# rewrite e fica só no servidor — precisa existir no BUILD porque rewrites() é
+# avaliado em build time e gravado no routes-manifest.
 ARG NEXT_PUBLIC_API_URL=/api
-
-# BACKEND_URL é lido pelo rewrite. Passado TAMBÉM como build arg porque o Next resolve
-# rewrites() ao gerar o routes-manifest, durante o build — definir só em runtime pode
-# não surtir efeito. Continue definindo nas duas pontas (build e runtime) por segurança.
 ARG BACKEND_URL=http://localhost:8080
 
 # Definir variáveis de ambiente ANTES do build
