@@ -3,33 +3,34 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { httpClient } from '@/lib/http/client';
-import type { CustodiadoData } from '@/types/api';
-import type { CustodiadosPaginadosParams, PaginacaoMeta } from '@/types/pagination';
+import type { PessoaMonitoradaData } from '@/types/api';
+import type { PessoasMonitoradasPaginadosParams, PaginacaoMeta } from '@/types/pagination';
 
-interface UseCustodiadosPaginadosOptions {
+interface UsePessoasMonitoradasPaginadosOptions {
   size?: number;
   autoLoad?: boolean;
   filtrosIniciais?: {
     nome?: string;
     cpf?: string;
     status?: string;
-    ordenarPor?: CustodiadosPaginadosParams['ordenarPor'];
-    direcao?: CustodiadosPaginadosParams['direcao'];
+    natureza?: PessoasMonitoradasPaginadosParams['natureza'];
+    ordenarPor?: PessoasMonitoradasPaginadosParams['ordenarPor'];
+    direcao?: PessoasMonitoradasPaginadosParams['direcao'];
   };
 }
 
-interface UseCustodiadosPaginadosReturn {
-  custodiados: CustodiadoData[];
+interface UsePessoasMonitoradasPaginadosReturn {
+  custodiados: PessoaMonitoradaData[];
   paginacao: PaginacaoMeta;
   loading: boolean;
   error: string | null;
-  filtrosAtivos: Partial<CustodiadosPaginadosParams>;
+  filtrosAtivos: Partial<PessoasMonitoradasPaginadosParams>;
   irParaPagina: (page: number) => void;
   proximaPagina: () => void;
   paginaAnterior: () => void;
-  aplicarFiltros: (filtros: Partial<CustodiadosPaginadosParams>) => void;
+  aplicarFiltros: (filtros: Partial<PessoasMonitoradasPaginadosParams>) => void;
   limparFiltros: () => void;
-  ordenarPor: (campo: CustodiadosPaginadosParams['ordenarPor'], direcao?: 'asc' | 'desc') => void;
+  ordenarPor: (campo: PessoasMonitoradasPaginadosParams['ordenarPor'], direcao?: 'asc' | 'desc') => void;
   refetch: () => void;
 }
 
@@ -42,12 +43,12 @@ const PAGINACAO_INICIAL: PaginacaoMeta = {
   temAnterior: false,
 };
 
-export function useCustodiadosPaginados(
-  options: UseCustodiadosPaginadosOptions = {}
-): UseCustodiadosPaginadosReturn {
+export function usePessoasMonitoradasPaginados(
+  options: UsePessoasMonitoradasPaginadosOptions = {}
+): UsePessoasMonitoradasPaginadosReturn {
   const { size = 20, autoLoad = true, filtrosIniciais = {} } = options;
 
-  const [custodiados, setCustodiados] = useState<CustodiadoData[]>([]);
+  const [custodiados, setCustodiados] = useState<PessoaMonitoradaData[]>([]);
   const [paginacao, setPaginacao] = useState<PaginacaoMeta>({
     ...PAGINACAO_INICIAL,
     itensPorPagina: size,
@@ -55,12 +56,13 @@ export function useCustodiadosPaginados(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [params, setParams] = useState<CustodiadosPaginadosParams>({
+  const [params, setParams] = useState<PessoasMonitoradasPaginadosParams>({
     page: 0,
     size,
     nome: filtrosIniciais.nome,
     cpf: filtrosIniciais.cpf,
     status: filtrosIniciais.status,
+    natureza: filtrosIniciais.natureza,
     ordenarPor: filtrosIniciais.ordenarPor || 'nome',
     direcao: filtrosIniciais.direcao || 'asc',
   });
@@ -69,7 +71,7 @@ export function useCustodiadosPaginados(
   const paramsRef = useRef(params);
   paramsRef.current = params;
 
-  const buscar = useCallback(async (parametros: CustodiadosPaginadosParams) => {
+  const buscar = useCallback(async (parametros: PessoasMonitoradasPaginadosParams) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -86,17 +88,18 @@ export function useCustodiadosPaginados(
       if (parametros.nome) queryParams.nome = parametros.nome;
       if (parametros.cpf) queryParams.cpf = parametros.cpf;
       if (parametros.status) queryParams.status = parametros.status;
+      if (parametros.natureza) queryParams.natureza = parametros.natureza;
       if (parametros.ordenarPor) queryParams.ordenarPor = parametros.ordenarPor;
       if (parametros.direcao) queryParams.direcao = parametros.direcao;
 
-      const response = await httpClient.get<any>('/custodiados', queryParams);
+      const response = await httpClient.get<any>('/pessoas-monitoradas', queryParams);
 
       if (abortControllerRef.current?.signal.aborted) return;
 
       if (response.success && response.data) {
         const dados = response.data;
 
-        let lista: CustodiadoData[] = [];
+        let lista: PessoaMonitoradaData[] = [];
         if (Array.isArray(dados)) {
           lista = dados;
         } else if (Array.isArray(dados.data)) {
@@ -131,7 +134,7 @@ export function useCustodiadosPaginados(
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      console.error('[useCustodiadosPaginados] Erro:', err);
+      console.error('[usePessoasMonitoradasPaginados] Erro:', err);
       setError('Erro ao conectar com o servidor');
       setCustodiados([]);
     } finally {
@@ -200,7 +203,7 @@ export function useCustodiadosPaginados(
     }
   }, [paginacao.temAnterior]);
 
-  const aplicarFiltros = useCallback((filtros: Partial<CustodiadosPaginadosParams>) => {
+  const aplicarFiltros = useCallback((filtros: Partial<PessoasMonitoradasPaginadosParams>) => {
     setParams(prev => ({ ...prev, ...filtros, page: 0 }));
   }, []);
 
@@ -209,7 +212,7 @@ export function useCustodiadosPaginados(
   }, [size]);
 
   const ordenarPorFn = useCallback((
-    campo: CustodiadosPaginadosParams['ordenarPor'],
+    campo: PessoasMonitoradasPaginadosParams['ordenarPor'],
     direcao?: 'asc' | 'desc'
   ) => {
     setParams(prev => ({

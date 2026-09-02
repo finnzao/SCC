@@ -13,7 +13,7 @@ export function AnaliseAtrasos({ analise }: AnaliseAtrasosProps) {
     <Card className="p-6">
       <h3 className="text-xl font-semibold text-primary-dark mb-4 flex items-center gap-2">
         <UserX className="w-5 h-5" />
-        Análise de Atrasos
+        Análise de Inadimplência
       </h3>
 
       {temAtrasos ? (

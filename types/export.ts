@@ -1,4 +1,4 @@
-import { CustodiadoData } from './api';
+import { PessoaMonitoradaData } from './api';
 
 /**
  * Informações de filtro aplicados na exportação
@@ -40,7 +40,7 @@ export interface ExportOptions {
 /**
  * Dados de exportação com campos calculados
  */
-export type ExportData = CustodiadoData & {
+export type ExportData = PessoaMonitoradaData & {
   /** Número de dias em atraso (se aplicável) */
   diasAtraso?: number;
   

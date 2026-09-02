@@ -57,7 +57,7 @@ export default function BuscarPage() {
   // For now, pass the custodiadoId - the detail page will handle looking up via the list endpoint
   const handleVerPerfil = (custodiadoId: number) => {
     // TODO: If search results include custodiadoUuid, use that instead
-    router.push(`/dashboard/custodiados/${custodiadoId}`);
+    router.push(`/dashboard/pessoas/${custodiadoId}`);
   };
 
   return (

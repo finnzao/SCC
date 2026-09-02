@@ -92,7 +92,7 @@ function resolveId(id: string | number | undefined): string | number {
   return id;
 }
 
-export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onExcluir }: Props) {
+export default function DetalhesPessoaMonitoradaModal({ dados, onClose, onEditar, onExcluir }: Props) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -200,7 +200,7 @@ export default function DetalhesCustodiadoModal({ dados, onClose, onEditar, onEx
       <div className="relative bg-white p-6 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
           <div>
-            <h3 className="text-2xl font-bold text-primary-dark">Detalhes do Custodiado</h3>
+            <h3 className="text-2xl font-bold text-primary-dark">Detalhes do Pessoa Monitorada</h3>
             <p className="text-text-muted mt-1">Informações completas do registro</p>
           </div>
           <button

@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCustodiados } from '@/hooks/useAPI';
-import { CustodiadoData, TipoValidacao } from '@/types/api';
+import { usePessoasMonitoradas } from '@/hooks/useAPI';
+import { PessoaMonitoradaData, TipoValidacao } from '@/types/api';
 import type { Processo } from '@/types/processo';
 import { useToastHelpers } from '@/components/Toast';
 import { calcularProximoComparecimento, formatarPeriodicidade } from '@/lib/utils/periodicidade';
@@ -32,7 +32,7 @@ function getNumericIdFromProcesso(proc: any): number {
   return (!isNaN(parsed) && parsed > 0) ? parsed : 0;
 }
 
-function buildCustodiadoFromProcesso(proc: any): CustodiadoData {
+function buildPessoaMonitoradaFromProcesso(proc: any): PessoaMonitoradaData {
   const numId = getNumericIdFromProcesso(proc);
   return {
     id: numId,
@@ -56,20 +56,20 @@ function buildCustodiadoFromProcesso(proc: any): CustodiadoData {
     estado: '',
     criadoEm: proc.criadoEm || '',
     atualizadoEm: proc.atualizadoEm || null,
-  } as CustodiadoData;
+  } as PessoaMonitoradaData;
 }
 
-function enrichWithListData(base: CustodiadoData, list: CustodiadoData[] | null, targetNumericId: number): CustodiadoData {
+function enrichWithListData(base: PessoaMonitoradaData, list: PessoaMonitoradaData[] | null, targetNumericId: number): PessoaMonitoradaData {
   if (!list || !Array.isArray(list) || targetNumericId <= 0) return base;
   const match = list.find((c: any) => {
     const n = c.numericId || c.id;
     return (typeof n === 'number' ? n : parseInt(String(n))) === targetNumericId;
   });
   if (!match) return base;
-  return { ...base, ...match, id: targetNumericId, numericId: targetNumericId } as CustodiadoData;
+  return { ...base, ...match, id: targetNumericId, numericId: targetNumericId } as PessoaMonitoradaData;
 }
 
-function resolveNumericId(custodiado: CustodiadoData | null): number {
+function resolveNumericId(custodiado: PessoaMonitoradaData | null): number {
   if (!custodiado) return 0;
   const raw = (custodiado as any).numericId || custodiado.id;
   const num = typeof raw === 'number' ? raw : parseInt(String(raw));
@@ -81,7 +81,7 @@ function isUUID(val: any): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val));
 }
 
-function resolveCustodiadoUuid(custodiado: CustodiadoData | null, custodiados: CustodiadoData[] | null): string | null {
+function resolvePessoaMonitoradaUuid(custodiado: PessoaMonitoradaData | null, custodiados: PessoaMonitoradaData[] | null): string | null {
   if (!custodiado) return null;
   const rawId = (custodiado as any).publicId || (custodiado as any).uuid;
   if (rawId && isUUID(rawId)) return String(rawId);
@@ -116,14 +116,14 @@ interface UseConfirmarPresencaParams {
 export function useConfirmarPresenca({ processoParam, processoIdParam, custodiadoIdParam }: UseConfirmarPresencaParams) {
   const router = useRouter();
   const { success, error } = useToastHelpers();
-  const { custodiados, loading: loadingCustodiados, error: errorCustodiados, refetch } = useCustodiados();
+  const { custodiados, loading: loadingPessoasMonitoradas, error: errorPessoasMonitoradas, refetch } = usePessoasMonitoradas();
 
   const [loadingComparecimento, setLoadingComparecimento] = useState(false);
-  const [custodiado, setCustodiado] = useState<CustodiadoData | null>(null);
+  const [custodiado, setCustodiado] = useState<PessoaMonitoradaData | null>(null);
   const [estado, setEstado] = useState<EstadoPagina>('inicial');
   const [mensagem, setMensagem] = useState('');
   const [buscaProcesso, setBuscaProcesso] = useState(processoParam || '');
-  const [resultadosBusca, setResultadosBusca] = useState<CustodiadoData[]>([]);
+  const [resultadosBusca, setResultadosBusca] = useState<PessoaMonitoradaData[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
   const [nomeUsuarioLogado, setNomeUsuarioLogado] = useState('');
 
@@ -199,7 +199,7 @@ export function useConfirmarPresenca({ processoParam, processoIdParam, custodiad
           setProcessoSelecionado(proc);
           setProcessosDisponiveis([proc]);
           setTemMultiplosProcessos(false);
-          const fromProc = buildCustodiadoFromProcesso(proc);
+          const fromProc = buildPessoaMonitoradaFromProcesso(proc);
           const numId = getNumericIdFromProcesso(proc);
           const enriched = enrichWithListData(fromProc, custodiados, numId);
           setCustodiado(enriched);
@@ -235,7 +235,7 @@ export function useConfirmarPresenca({ processoParam, processoIdParam, custodiad
               if (!isNaN(resolvedNum) && resolvedNum > 0) {
                 const ativos = await carregarProcessosAtivos(resolvedNum);
                 if (ativos.length >= 1) {
-                  const fromProc = buildCustodiadoFromProcesso(ativos[0]);
+                  const fromProc = buildPessoaMonitoradaFromProcesso(ativos[0]);
                   fromProc.id = resolvedNum;
                   (fromProc as any).numericId = resolvedNum;
                   const enriched = enrichWithListData(fromProc, custodiados, resolvedNum);
@@ -249,7 +249,7 @@ export function useConfirmarPresenca({ processoParam, processoIdParam, custodiad
         }
         const ativos = await carregarProcessosAtivos(numId);
         if (ativos.length >= 1) {
-          const fromProc = buildCustodiadoFromProcesso(ativos[0]);
+          const fromProc = buildPessoaMonitoradaFromProcesso(ativos[0]);
           fromProc.id = numId;
           (fromProc as any).numericId = numId;
           const enriched = enrichWithListData(fromProc, custodiados, numId);
@@ -294,7 +294,7 @@ export function useConfirmarPresenca({ processoParam, processoIdParam, custodiad
     }
   }, [buscaProcesso, custodiados, error, normalizarTexto]);
 
-  const selecionarPessoa = useCallback(async (pessoa: CustodiadoData) => {
+  const selecionarPessoa = useCallback(async (pessoa: PessoaMonitoradaData) => {
     setCustodiado(pessoa);
     setMostrarResultados(false);
     setProcessoSelecionado(null);
@@ -387,9 +387,9 @@ export function useConfirmarPresenca({ processoParam, processoIdParam, custodiad
         setEstado('sucesso');
         await new Promise(r => setTimeout(r, 500));
         try { await refetch(); } catch { /* ignore */ }
-        const custodiadoUuid = resolveCustodiadoUuid(custodiado, custodiados);
+        const custodiadoUuid = resolvePessoaMonitoradaUuid(custodiado, custodiados);
         if (custodiadoUuid) {
-          setTimeout(() => router.push(`/dashboard/custodiados/${custodiadoUuid}?refresh=true`), 1500);
+          setTimeout(() => router.push(`/dashboard/pessoas/${custodiadoUuid}?refresh=true`), 1500);
         } else {
           setTimeout(() => router.push('/dashboard/geral'), 1500);
         }
@@ -437,9 +437,9 @@ export function useConfirmarPresenca({ processoParam, processoIdParam, custodiad
   };
 
   return {
-    loadingCustodiados,
+    loadingPessoasMonitoradas,
     loadingComparecimento,
-    errorCustodiados,
+    errorPessoasMonitoradas,
     custodiado,
     estado,
     setEstado,

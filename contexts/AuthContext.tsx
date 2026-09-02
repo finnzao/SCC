@@ -76,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearAuthData = useCallback(() => {
     logger.log('[AuthContext] Limpando dados de autenticação');
-    // O cookie httpOnly é apagado pelo backend em /auth/logout — JS não o alcança.
     authService.clearAuth();
     setUser(null);
   }, []);
@@ -89,9 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Não dá mais para inspecionar o token daqui (httpOnly) — nem é preciso: quem sabe
-      // se a sessão vale é o servidor. Pedimos o perfil; se vier 401, o httpClient tenta
-      // renovar pelo cookie de refresh sozinho e só então falha.
+      // token e httpOnly: quem valida a sessao e o backend via /auth/perfil
       const profileResponse = await authService.getProfile();
       if (profileResponse.success && profileResponse.data) {
         const userData = profileResponse.data || profileResponse.data;
@@ -120,9 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('token-expired', handleTokenExpired);
   }, [router, clearAuthData]);
 
-  // O polling de 60s que decodificava o token foi removido junto com o acesso a ele.
-  // A renovação passou a ser reativa: 401 → httpClient renova pelo cookie → repete a
-  // requisição. Menos código e sem o relógio do cliente decidindo validade de sessão.
   useEffect(() => {
     loadUser();
   }, [loadUser]);
@@ -132,7 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logger.log('[AuthContext] Iniciando login para:', email);
       const result = await authService.login({ email, senha, rememberMe });
       if (result.success && result.data) {
-        // Cookies httpOnly já chegaram no Set-Cookie: nada para gravar no browser.
         setUser({
           id: result.data.usuario.id, nome: result.data.usuario.nome, email: result.data.usuario.email,
           tipo: result.data.usuario.tipo, departamento: result.data.usuario.departamento,
@@ -152,9 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // Chamada incondicional: só o backend consegue apagar o cookie httpOnly e revogar
-      // a sessão. Antes isto era condicionado a ter um refresh token em JS — que não
-      // existe mais, o que deixaria o cookie vivo no servidor após o "logout".
+      // so o backend apaga o cookie httpOnly e revoga a sessao
       await authService.logout({ refreshToken: '' });
     } catch {
       /* falha de rede não pode impedir o logout local */

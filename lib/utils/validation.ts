@@ -249,3 +249,6 @@ export const ValidationPhoneKey = (event: React.KeyboardEvent): boolean => {
   const isModifier = event.ctrlKey || event.metaKey;
   return isNumber || isAllowedChar || isControl || isModifier;
 };
+
+// sanitizacao de input numerico: mantem so digitos (bloqueia e, +, -, colagem suja)
+export const ApenasDigitos = (valor: string): string => valor.replace(/[^0-9]/g, '');

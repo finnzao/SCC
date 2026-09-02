@@ -17,7 +17,8 @@ export enum StatusComparecimento {
 export enum TipoValidacao {
   PRESENCIAL = 'presencial',
   ONLINE = 'online',
-  CADASTRO_INICIAL = 'cadastro_inicial'
+  CADASTRO_INICIAL = 'cadastro_inicial',
+  FALTA_JUSTIFICADA = 'falta_justificada'
 }
 
 export enum TipoUsuario {
@@ -33,7 +34,7 @@ export enum StatusConvite {
   AGUARDANDO_VERIFICACAO = 'AGUARDANDO_VERIFICACAO'
 }
 
-export enum SituacaoCustodiado {
+export enum SituacaoPessoaMonitorada {
   ATIVO = 'ATIVO',
   ARQUIVADO = 'ARQUIVADO'
 }
@@ -59,8 +60,8 @@ export interface EnderecoDTO {
   estado: string;
 }
 
-// CustodiadoDTO para criação (sem ID)
-export interface CustodiadoCreateDTO {
+// PessoaMonitoradaDTO para criação (sem ID)
+export interface PessoaMonitoradaCreateDTO {
   nome: string;
   cpf?: string;
   rg?: string;
@@ -81,8 +82,8 @@ export interface CustodiadoCreateDTO {
   estado: string;
 }
 
-// CustodiadoDTO completo (com ID e campos adicionais)
-export interface CustodiadoDTO {
+// PessoaMonitoradaDTO completo (com ID e campos adicionais)
+export interface PessoaMonitoradaDTO {
   id?: number;
   nome: string;
   cpf?: string;
@@ -107,7 +108,7 @@ export interface CustodiadoDTO {
   estado: string;
 }
 
-export interface CustodiadoData extends CustodiadoDTO {
+export interface PessoaMonitoradaData extends PessoaMonitoradaDTO {
   id?: number;
   numericId: number;
   periodicidadeDescricao?: string;
@@ -121,21 +122,24 @@ export interface CustodiadoData extends CustodiadoDTO {
   identificacao?: string;
   inadimplente?: boolean;
   comparecimentoHoje?: boolean;
+  situacao?: 'ATIVO' | 'ARQUIVADO' | 'FORAGIDO';
+  natureza?: 'CAUTELAR' | 'EXECUCAO' | 'MISTO';
+  motivoArquivamento?: string;
   atrasado?: boolean;
   enderecoCompleto?: string;
   urgente?:boolean;
   cidadeEstado?: string;
 }
 
-// CustodiadoListDTO para listagens simplificadas
-export interface CustodiadoListDTO {
+// PessoaMonitoradaListDTO para listagens simplificadas
+export interface PessoaMonitoradaListDTO {
   id: number;
   nome: string;
   cpf?: string;
   processo: string;
   comarca: string;
   status: StatusComparecimento;
-  situacao: SituacaoCustodiado;
+  situacao: SituacaoPessoaMonitorada;
   proximoComparecimento?: string;
   diasAtraso?: number;
   enderecoResumido?: string;
@@ -579,7 +583,7 @@ export interface ComparecimentoResponse {
   id: number;
   custodiadoId: number;
   custodiadoNome?: string;
-  processoCustodiado?: string;
+  processoPessoaMonitorada?: string;
   dataComparecimento: string;
   horaComparecimento?: string;
   tipoValidacao: TipoValidacao;
@@ -704,6 +708,11 @@ export interface ResumoSistema {
   percentualConformidade?: number;
   percentualInadimplencia?: number;
   dataConsulta?: string;
+  foragidos?: number;
+  processosCautelar?: number;
+  processosExecucao?: number;
+  execucoesAguardandoJustificacao?: number;
+  execucoesProximasExtincao?: number;
   relatorioUltimosMeses?: RelatorioUltimosMeses;
   tendenciaConformidade?: TendenciaMensal[];
   proximosComparecimentos?: ProximosComparecimentos;
@@ -745,17 +754,17 @@ export interface ProximosComparecimentos {
   comparecimentosHoje: number;
   comparecimentosAmanha: number;
   detalhesPorDia?: ComparecimentoDiario[];
-  custodiadosAtrasados?: DetalheCustodiado[];
+  custodiadosAtrasados?: DetalhePessoaMonitorada[];
 }
 
 export interface ComparecimentoDiario {
   data: string;
   diaSemana: string;
   totalPrevisto: number;
-  custodiados?: DetalheCustodiado[];
+  custodiados?: DetalhePessoaMonitorada[];
 }
 
-export interface DetalheCustodiado {
+export interface DetalhePessoaMonitorada {
   id: number;
   nome: string;
   processo: string;
@@ -780,15 +789,15 @@ export interface AnaliseAtrasos {
   totalAtrasadosMais90Dias: number;
   mediaDiasAtraso: number;
   distribuicaoAtrasos?: Record<string, number>;
-  custodiadosAtrasados30Dias?: DetalheCustodiadoAtrasado[];
-  custodiadosAtrasados60Dias?: DetalheCustodiadoAtrasado[];
-  custodiadosAtrasados90Dias?: DetalheCustodiadoAtrasado[];
-  custodiadosAtrasadosMais90Dias?: DetalheCustodiadoAtrasado[];
-  custodiadoMaiorAtraso?: DetalheCustodiadoAtrasado;
+  custodiadosAtrasados30Dias?: DetalhePessoaMonitoradaAtrasado[];
+  custodiadosAtrasados60Dias?: DetalhePessoaMonitoradaAtrasado[];
+  custodiadosAtrasados90Dias?: DetalhePessoaMonitoradaAtrasado[];
+  custodiadosAtrasadosMais90Dias?: DetalhePessoaMonitoradaAtrasado[];
+  custodiadoMaiorAtraso?: DetalhePessoaMonitoradaAtrasado;
   dataAnalise: string;
 }
 
-export interface DetalheCustodiadoAtrasado {
+export interface DetalhePessoaMonitoradaAtrasado {
   id: number;
   nome: string;
   processo: string;
@@ -884,16 +893,16 @@ export interface StatusEstatisticasResponse {
 }
 
 // Interfaces mantidas do frontend
-export interface ListarCustodiadosResponse {
+export interface ListarPessoasMonitoradasResponse {
   success: boolean;
   message: string;
-  data: CustodiadoData[];
+  data: PessoaMonitoradaData[];
   timestamp?: string;
   total?: number;
 }
 
 // Type Guards (mantidos para compatibilidade)
-export function isListarCustodiadosResponse(data: any): data is ListarCustodiadosResponse {
+export function isListarPessoasMonitoradasResponse(data: any): data is ListarPessoasMonitoradasResponse {
   return (
     data &&
     typeof data === 'object' &&
@@ -903,7 +912,7 @@ export function isListarCustodiadosResponse(data: any): data is ListarCustodiado
   );
 }
 
-export function isCustodiadoResponse(data: any): data is CustodiadoDTO {
+export function isPessoaMonitoradaResponse(data: any): data is PessoaMonitoradaDTO {
   return (
     data &&
     typeof data === 'object' &&
@@ -923,12 +932,12 @@ export type LogoutRequest = LogoutRequestDTO;
 export type AlterarSenhaRequest = AlterarSenhaDTO;
 export type ResetSenhaRequest = PasswordResetRequestDTO;
 export type ConfirmarResetRequest = PasswordResetConfirmDTO;
-export type CustodiadoResponse = ApiResponse<CustodiadoData>;
+export type PessoaMonitoradaResponse = ApiResponse<PessoaMonitoradaData>;
 export type EstatisticasComparecimentoResponse = EstatisticasComparecimento;
 export type ResumoSistemaResponse = ResumoSistema;
 
 import type { Processo } from './processo';
 
-export interface CustodiadoComProcessos extends CustodiadoData {
+export interface PessoaMonitoradaComProcessos extends PessoaMonitoradaData {
   processos: Processo[];
 }

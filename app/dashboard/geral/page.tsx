@@ -4,11 +4,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
-import { useCustodiadosPaginados } from '@/hooks/useCustodiadosPaginados';
+import { usePessoasMonitoradasPaginados } from '@/hooks/usePessoasMonitoradasPaginados';
 import { exportarComFallback } from '@/services/exportacaoService';
 import { useToast } from '@/components/Toast';
 import { formatToBrazilianDate } from '@/lib/utils/dateutils';
-import type { CustodiadoData } from '@/types/api';
+import type { PessoaMonitoradaData } from '@/types/api';
 import {
   Search,
   AlertTriangle,
@@ -28,6 +28,39 @@ import {
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 400;
 
+// separa os dois publicos monitorados; quem tem os dois vinculos fica na aba Execucao com badge Misto
+function NaturezaTabs({ value, onChange }: {
+  value: 'CAUTELAR' | 'EXECUCAO';
+  onChange: (v: 'CAUTELAR' | 'EXECUCAO') => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg bg-gray-100 p-1">
+      {([
+        { id: 'CAUTELAR', label: 'Cautelares' },
+        { id: 'EXECUCAO', label: 'Execução de pena' },
+      ] as const).map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            value === t.id
+              ? t.id === 'EXECUCAO' ? 'bg-white text-purple-700 shadow-sm' : 'bg-white text-primary shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MistoBadge({ natureza }: { natureza?: string }) {
+  if (natureza !== 'MISTO') return null;
+  return (
+    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 flex-shrink-0">
+      Cautelar + Execução
+    </span>
+  );
+}
+
 function GeralPage() {
   const router = useRouter();
   const searchParams = useSearchParamsSafe();
@@ -36,6 +69,9 @@ function GeralPage() {
 
   const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'EM_CONFORMIDADE' | 'INADIMPLENTE'>('todos');
+  const [filtroNatureza, setFiltroNatureza] = useState<'CAUTELAR' | 'EXECUCAO'>(
+    searchParams.get('natureza') === 'EXECUCAO' ? 'EXECUCAO' : 'CAUTELAR'
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -70,12 +106,13 @@ function GeralPage() {
     limparFiltros: limparFiltrosHook,
     ordenarPor,
     refetch,
-  } = useCustodiadosPaginados({
+  } = usePessoasMonitoradasPaginados({
     size: PAGE_SIZE,
     autoLoad: true,
     filtrosIniciais: {
       nome: searchParams.get('busca') || undefined,
       status: searchParams.get('status') || undefined,
+      natureza: searchParams.get('natureza') === 'EXECUCAO' ? 'EXECUCAO' : 'CAUTELAR',
       ordenarPor: 'nome',
       direcao: 'asc',
     },
@@ -97,20 +134,22 @@ function GeralPage() {
     aplicarFiltros({
       nome: filtroTextoDebounced || undefined,
       status: filtroStatus !== 'todos' ? filtroStatus : undefined,
+      natureza: filtroNatureza,
     });
-  }, [filtroTextoDebounced, filtroStatus, aplicarFiltros]);
+  }, [filtroTextoDebounced, filtroStatus, filtroNatureza, aplicarFiltros]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (filtroTexto) params.set('busca', filtroTexto);
     if (filtroStatus !== 'todos') params.set('status', filtroStatus);
+    if (filtroNatureza !== 'CAUTELAR') params.set('natureza', filtroNatureza);
     const qs = params.toString();
     window.history.replaceState(
       {},
       '',
       qs ? `${window.location.pathname}?${qs}` : window.location.pathname
     );
-  }, [filtroTexto, filtroStatus]);
+  }, [filtroTexto, filtroStatus, filtroNatureza]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -128,9 +167,9 @@ function GeralPage() {
   }, []);
 
   const handleVerDetalhes = useCallback(
-    (item: CustodiadoData) => {
+    (item: PessoaMonitoradaData) => {
       const id = (item as any).id || (item as any).publicId;
-      router.push(`/dashboard/custodiados/${id}`);
+      router.push(`/dashboard/pessoas/${id}`);
     },
     [router]
   );
@@ -154,6 +193,7 @@ function GeralPage() {
       const resultado = await exportarComFallback({
         nome: filtroTexto || undefined,
         status: filtroStatus !== 'todos' ? filtroStatus : undefined,
+        natureza: filtroNatureza,
       });
 
       if (resultado.success) {
@@ -181,7 +221,7 @@ function GeralPage() {
     } finally {
       setIsExporting(false);
     }
-  }, [filtroTexto, filtroStatus, showToast]);
+  }, [filtroTexto, filtroStatus, filtroNatureza, showToast]);
 
   const handleRefresh = useCallback(async () => {
     await refetch();
@@ -267,7 +307,7 @@ function GeralPage() {
         <div className="p-4 space-y-4">
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold text-gray-800">Custodiados</h1>
+              <h1 className="text-xl font-bold text-gray-800">Pessoas Monitoradas</h1>
               <div className="flex gap-2">
                 <button onClick={() => setShowFilters(!showFilters)} className="p-2 bg-primary text-white rounded-lg">
                   <SlidersHorizontal className="w-5 h-5" />
@@ -279,6 +319,10 @@ function GeralPage() {
                   <RefreshCw className="w-5 h-5" />
                 </button>
               </div>
+            </div>
+
+            <div className="mb-3">
+              <NaturezaTabs value={filtroNatureza} onChange={setFiltroNatureza} />
             </div>
 
             {showFilters && (
@@ -347,7 +391,10 @@ function GeralPage() {
                     <div className="flex items-center gap-2 flex-1">
                       <User className="w-5 h-5 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-800 truncate">{item.nome}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-800 truncate">{item.nome}</h3>
+                          <MistoBadge natureza={(item as any).natureza} />
+                        </div>
                         <p className="text-xs text-gray-600">{item.cpf}</p>
                       </div>
                     </div>
@@ -444,7 +491,7 @@ function GeralPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  Gerenciamento de Custodiados
+                  Gerenciamento de Pessoas Monitoradas
                 </h1>
                 <p className="text-gray-600">Visualize, filtre e gerencie todos os custodiados</p>
               </div>
@@ -479,6 +526,10 @@ function GeralPage() {
                   )}
                 </button>
               </div>
+            </div>
+
+            <div className="mb-4">
+              <NaturezaTabs value={filtroNatureza} onChange={setFiltroNatureza} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -610,7 +661,10 @@ function GeralPage() {
                         onClick={() => handleVerDetalhes(item)}
                       >
                         <td className="p-3">
-                          <p className="font-medium text-text-base">{item.nome}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-text-base">{item.nome}</p>
+                            <MistoBadge natureza={(item as any).natureza} />
+                          </div>
                           <p className="text-sm text-text-muted">{item.cpf}</p>
                         </td>
                         <td className="p-3">

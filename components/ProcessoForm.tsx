@@ -59,7 +59,7 @@ export default function ProcessoForm({ custodiadoId, custodiadoNome, onClose, on
     const newErrors: Record<string, string> = {};
 
     if (!form.custodiadoId || form.custodiadoId <= 0) {
-      newErrors.custodiadoId = 'Custodiado é obrigatório';
+      newErrors.custodiadoId = 'Pessoa Monitorada é obrigatório';
     }
 
     if (!form.numeroProcesso.trim()) {

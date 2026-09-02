@@ -6,5 +6,5 @@ export { useConfirmDialog } from './useConfirmDialog';
 export { useUserManagement } from './useUserManagement';
 export { useHistoricoEndereco } from './useHistoricoEndereco';
 // (paginação server-side)
-export { useCustodiadosPaginados } from './useCustodiadosPaginados';
+export { usePessoasMonitoradasPaginados } from './usePessoasMonitoradasPaginados';
 export { useComparecimentosPaginados } from './useComparecimentosPaginados';

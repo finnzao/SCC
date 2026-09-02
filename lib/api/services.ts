@@ -4,10 +4,10 @@ import { httpClient } from '@/lib/http/client';
 import { requestCache } from '@/lib/cache/requestCache';
 import { logger } from '@/lib/utils/logger';
 import type {
-  CustodiadoResponse,
+  PessoaMonitoradaResponse,
   ComparecimentoResponse,
   UsuarioResponse,
-  CustodiadoDTO,
+  PessoaMonitoradaDTO,
   ComparecimentoDTO,
   UsuarioDTO,
   StatusComparecimento,
@@ -21,7 +21,7 @@ import type {
   AppInfoResponse,
   StatusVerificacaoResponse,
   StatusEstatisticasResponse,
-  ListarCustodiadosResponse,
+  ListarPessoasMonitoradasResponse,
   ListarComparecimentosParams,
   ListarComparecimentosResponse,
   ValidarConviteResponse,
@@ -54,21 +54,21 @@ export function clearAuthHeaders() {
 }
 
 export const custodiadosService = {
-  async listar(options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<ListarCustodiadosResponse> {
-    const cacheKey = 'custodiados:list';
+  async listar(options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<ListarPessoasMonitoradasResponse> {
+    const cacheKey = 'pessoas-monitoradas:list';
     const cacheTimeout = options?.cacheTimeout || 5 * 60 * 1000;
 
     if (!options?.forceRefresh) {
-      const cached = requestCache.get<ListarCustodiadosResponse>(cacheKey);
+      const cached = requestCache.get<ListarPessoasMonitoradasResponse>(cacheKey);
       if (cached) {
-        logger.log('[CustodiadosService] Retornando dados do cache');
+        logger.log('[PessoasMonitoradasService] Retornando dados do cache');
         return cached;
       }
     }
 
     try {
-      const response = await apiClient.get<any>('/custodiados');
-      logger.log('[CustodiadosService] Resposta bruta:', response);
+      const response = await apiClient.get<any>('/pessoas-monitoradas');
+      logger.log('[PessoasMonitoradasService] Resposta bruta:', response);
 
       let parsedData: any;
       try {
@@ -82,11 +82,11 @@ export const custodiadosService = {
           parsedData = response.data;
         }
       } catch {
-        logger.error('[CustodiadosService] Erro no parse do JSON');
+        logger.error('[PessoasMonitoradasService] Erro no parse do JSON');
         return { success: false, message: 'Erro ao processar resposta do servidor', data: [] };
       }
 
-      let result: ListarCustodiadosResponse = { success: false, message: 'Nenhum custodiado encontrado', data: [] };
+      let result: ListarPessoasMonitoradasResponse = { success: false, message: 'Nenhum custodiado encontrado', data: [] };
 
       if (parsedData && parsedData.success && Array.isArray(parsedData.data)) {
         result = { success: true, message: parsedData.message || `${parsedData.data.length} custodiados carregados`, data: parsedData.data };
@@ -105,45 +105,45 @@ export const custodiadosService = {
       if (result.success && result.data.length > 0) requestCache.set(cacheKey, result, cacheTimeout);
       return result;
     } catch (error) {
-      logger.error('[CustodiadosService] Erro ao listar custodiados:', error);
+      logger.error('[PessoasMonitoradasService] Erro ao listar custodiados:', error);
       return { success: false, message: error instanceof Error ? error.message : 'Erro ao listar custodiados', data: [] };
     }
   },
 
-  async buscarPorId(id: string | number, options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<CustodiadoResponse | null> {
+  async buscarPorId(id: string | number, options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<PessoaMonitoradaResponse | null> {
     if (!id) return null;
     const cacheKey = `custodiados:id:${id}`;
     const cacheTimeout = options?.cacheTimeout || 2 * 60 * 1000;
     if (!options?.forceRefresh) {
-      const cached = requestCache.get<CustodiadoResponse>(cacheKey);
+      const cached = requestCache.get<PessoaMonitoradaResponse>(cacheKey);
       if (cached) return cached;
     }
     try {
-      const response = await apiClient.get<CustodiadoResponse>(`/custodiados/${id}`);
+      const response = await apiClient.get<PessoaMonitoradaResponse>(`/pessoas-monitoradas/${id}`);
       const result = response.success ? response.data || null : null;
       if (result) requestCache.set(cacheKey, result, cacheTimeout);
       return result;
     } catch (error) {
-      logger.error(`[CustodiadosService] Erro ao buscar custodiado ${id}:`, error);
+      logger.error(`[PessoasMonitoradasService] Erro ao buscar custodiado ${id}:`, error);
       return null;
     }
   },
 
-  async criar(data: CustodiadoDTO): Promise<ApiResponse<CustodiadoResponse>> {
+  async criar(data: PessoaMonitoradaDTO): Promise<ApiResponse<PessoaMonitoradaResponse>> {
     try {
-      const response = await apiClient.post<CustodiadoResponse>('/custodiados', data);
-      if (response.success) requestCache.clear('custodiados:list');
+      const response = await apiClient.post<PessoaMonitoradaResponse>('/pessoas-monitoradas', data);
+      if (response.success) requestCache.clear('pessoas-monitoradas:list');
       return response;
     } catch (error) {
       return { success: false, status: 500, message: error instanceof Error ? error.message : 'Erro ao criar custodiado', data: undefined };
     }
   },
 
-  async atualizar(id: string | number, data: Partial<CustodiadoDTO>): Promise<ApiResponse<CustodiadoResponse>> {
+  async atualizar(id: string | number, data: Partial<PessoaMonitoradaDTO>): Promise<ApiResponse<PessoaMonitoradaResponse>> {
     try {
-      const response = await apiClient.put<CustodiadoResponse>(`/custodiados/${id}`, data);
+      const response = await apiClient.put<PessoaMonitoradaResponse>(`/pessoas-monitoradas/${id}`, data);
       if (response.success) {
-        requestCache.clear('custodiados:list');
+        requestCache.clear('pessoas-monitoradas:list');
         requestCache.clear(`custodiados:id:${id}`);
       }
       return response;
@@ -152,11 +152,12 @@ export const custodiadosService = {
     }
   },
 
-  async excluir(id: string | number): Promise<ApiResponse<void>> {
+  async excluir(id: string | number, motivo?: string): Promise<ApiResponse<void>> {
     try {
-      const response = await apiClient.delete<void>(`/custodiados/${id}`);
+      const query = motivo ? `?motivo=${motivo}` : '';
+      const response = await apiClient.delete<void>(`/pessoas-monitoradas/${id}${query}`);
       if (response.success) {
-        requestCache.clear('custodiados:list');
+        requestCache.clear('pessoas-monitoradas:list');
         requestCache.clear(`custodiados:id:${id}`);
       }
       return response;
@@ -165,69 +166,90 @@ export const custodiadosService = {
     }
   },
 
-  async buscarPorProcesso(processo: string, options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<CustodiadoResponse | null> {
+  async declararForagido(id: string | number, motivo: string): Promise<ApiResponse<void>> {
+    const response = await apiClient.post<void>(`/pessoas-monitoradas/${id}/foragido`, { motivo });
+    if (response.success) requestCache.clear('pessoas-monitoradas:list');
+    return response;
+  },
+
+  async reativar(id: string | number): Promise<ApiResponse<void>> {
+    const response = await apiClient.post<void>(`/pessoas-monitoradas/${id}/reativar`, {});
+    if (response.success) requestCache.clear('pessoas-monitoradas:list');
+    return response;
+  },
+
+  async cpfArquivado(cpf: string): Promise<boolean> {
+    try {
+      const response = await apiClient.get<any>(`/pessoas-monitoradas/cpf-arquivado?cpf=${encodeURIComponent(cpf)}`);
+      return response.success && (response.data?.data === true || response.data === true);
+    } catch {
+      return false;
+    }
+  },
+
+  async buscarPorProcesso(processo: string, options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<PessoaMonitoradaResponse | null> {
     const cacheKey = `custodiados:processo:${processo}`;
     if (!options?.forceRefresh) {
-      const cached = requestCache.get<CustodiadoResponse>(cacheKey);
+      const cached = requestCache.get<PessoaMonitoradaResponse>(cacheKey);
       if (cached) return cached;
     }
     try {
-      const response = await apiClient.get<CustodiadoResponse>(`/custodiados/processo/${encodeURIComponent(processo)}`);
+      const response = await apiClient.get<PessoaMonitoradaResponse>(`/pessoas-monitoradas/processo/${encodeURIComponent(processo)}`);
       const result = response.success ? response.data || null : null;
       if (result) requestCache.set(cacheKey, result, options?.cacheTimeout || 3 * 60 * 1000);
       return result;
     } catch (error) {
-      logger.error(`[CustodiadosService] Erro ao buscar processo ${processo}:`, error);
+      logger.error(`[PessoasMonitoradasService] Erro ao buscar processo ${processo}:`, error);
       return null;
     }
   },
 
-  async buscarPorStatus(status: StatusComparecimento, options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<CustodiadoResponse[]> {
+  async buscarPorStatus(status: StatusComparecimento, options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<PessoaMonitoradaResponse[]> {
     const cacheKey = `custodiados:status:${status}`;
     if (!options?.forceRefresh) {
-      const cached = requestCache.get<CustodiadoResponse[]>(cacheKey);
+      const cached = requestCache.get<PessoaMonitoradaResponse[]>(cacheKey);
       if (cached) return cached;
     }
     try {
-      const response = await apiClient.get<CustodiadoResponse[]>(`/custodiados/status/${status}`);
+      const response = await apiClient.get<PessoaMonitoradaResponse[]>(`/pessoas-monitoradas/status/${status}`);
       const result = response.success ? response.data || [] : [];
       if (result.length > 0) requestCache.set(cacheKey, result, options?.cacheTimeout || 2 * 60 * 1000);
       return result;
     } catch (error) {
-      logger.error(`[CustodiadosService] Erro ao buscar por status ${status}:`, error);
+      logger.error(`[PessoasMonitoradasService] Erro ao buscar por status ${status}:`, error);
       return [];
     }
   },
 
-  async buscarInadimplentes(options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<CustodiadoResponse[]> {
+  async buscarInadimplentes(options?: { forceRefresh?: boolean; cacheTimeout?: number }): Promise<PessoaMonitoradaResponse[]> {
     const cacheKey = 'custodiados:inadimplentes';
     if (!options?.forceRefresh) {
-      const cached = requestCache.get<CustodiadoResponse[]>(cacheKey);
+      const cached = requestCache.get<PessoaMonitoradaResponse[]>(cacheKey);
       if (cached) return cached;
     }
     try {
-      const response = await apiClient.get<CustodiadoResponse[]>('/custodiados/inadimplentes');
+      const response = await apiClient.get<PessoaMonitoradaResponse[]>('/pessoas-monitoradas/inadimplentes');
       const result = response.success ? response.data || [] : [];
       requestCache.set(cacheKey, result, options?.cacheTimeout || 1 * 60 * 1000);
       return result;
     } catch (error) {
-      logger.error('[CustodiadosService] Erro ao buscar inadimplentes:', error);
+      logger.error('[PessoasMonitoradasService] Erro ao buscar inadimplentes:', error);
       return [];
     }
   },
 
-  async buscar(params: BuscarParams): Promise<CustodiadoResponse[]> {
+  async buscar(params: BuscarParams): Promise<PessoaMonitoradaResponse[]> {
     try {
-      const response = await apiClient.get<CustodiadoResponse[]>('/custodiados/buscar', params);
+      const response = await apiClient.get<PessoaMonitoradaResponse[]>('/pessoas-monitoradas/buscar', params);
       return response.success ? response.data || [] : [];
     } catch (error) {
-      logger.error('[CustodiadosService] Erro na busca:', error);
+      logger.error('[PessoasMonitoradasService] Erro na busca:', error);
       return [];
     }
   },
 
   invalidarCache(): void {
-    requestCache.clear('custodiados:list');
+    requestCache.clear('pessoas-monitoradas:list');
     requestCache.clear('custodiados:inadimplentes');
   },
 };
@@ -441,7 +463,7 @@ export const setupService = {
 export const testService = {
   async health(): Promise<HealthResponse> {
     try {
-      const response = await apiClient.get<any>('/custodiados', undefined, { requireAuth: false });
+      const response = await apiClient.get<any>('/pessoas-monitoradas', undefined, { requireAuth: false });
       if (response.success || response.status === 200) return { status: 'UP', timestamp: new Date().toISOString(), details: { message: 'API respondendo normalmente' } };
     } catch { /* fallthrough */ }
     try {

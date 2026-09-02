@@ -95,9 +95,9 @@ export function validateBeforeSend(data: any): any {
 
   // Accept either processoId or custodiadoId
   const hasProcessoId = data.processoId && data.processoId > 0;
-  const hasCustodiadoId = data.custodiadoId && data.custodiadoId > 0;
+  const hasPessoaMonitoradaId = data.custodiadoId && data.custodiadoId > 0;
 
-  if (!hasProcessoId && !hasCustodiadoId) {
+  if (!hasProcessoId && !hasPessoaMonitoradaId) {
     errors.push('É necessário informar o ID do processo ou do custodiado');
   }
 

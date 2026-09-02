@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { CustodiadoData } from '@/types/api';
+import { PessoaMonitoradaData } from '@/types/api';
 import { formatarPeriodicidade } from './periodicidade';
 
 /**
@@ -25,9 +25,9 @@ export interface ExportOptions {
 
 /**
  * Tipo para dados de exportação
- * Usa o tipo correto CustodiadoData e adiciona campos calculados
+ * Usa o tipo correto PessoaMonitoradaData e adiciona campos calculados
  */
-export type ExportData = CustodiadoData & {
+export type ExportData = PessoaMonitoradaData & {
   diasAtraso?: number;
   statusUrgencia?: string;
 };
@@ -64,7 +64,7 @@ const dateUtils = {
 /**
  * Prepara os dados para exportação, adicionando campos calculados
  */
-export function prepareExportData(dados: CustodiadoData[]): ExportData[] {
+export function prepareExportData(dados: PessoaMonitoradaData[]): ExportData[] {
   return dados.map(item => {
     const diasRestantes = dateUtils.getDaysUntil(item.proximoComparecimento);
     const isHoje = dateUtils.isToday(item.proximoComparecimento);
@@ -137,7 +137,7 @@ function formatStatus(status?: string): string {
 /**
  * Formatar endereço completo para exibição
  */
-function formatarEnderecoCompleto(endereco?: CustodiadoData['endereco']): string {
+function formatarEnderecoCompleto(endereco?: PessoaMonitoradaData['endereco']): string {
   if (!endereco) return '';
 
   const partes: string[] = [];
@@ -274,7 +274,7 @@ export function formatWorksheet(worksheet: XLSX.WorkSheet, dataLength: number) {
 /**
  * Função principal para exportar dados para Excel
  */
-export function exportToExcel(dados: CustodiadoData[], options: ExportOptions = {}) {
+export function exportToExcel(dados: PessoaMonitoradaData[], options: ExportOptions = {}) {
   const {
     filename = `comparecimentos_${new Date().toISOString().split('T')[0]}.xlsx`,
     sheetName = 'Comparecimentos',
@@ -350,8 +350,8 @@ export function exportToExcel(dados: CustodiadoData[], options: ExportOptions = 
  * Função para exportar dados filtrados
  */
 export function exportFilteredData(
-  dadosOriginais: CustodiadoData[],
-  dadosFiltrados: CustodiadoData[],
+  dadosOriginais: PessoaMonitoradaData[],
+  dadosFiltrados: PessoaMonitoradaData[],
   filterInfo?: ExportFilterInfo
 ) {
   const hasFilters = filterInfo && Object.values(filterInfo).some(value => value && value !== 'todos');
@@ -369,7 +369,7 @@ export function exportFilteredData(
 /**
  * Calcular estatísticas dos dados
  */
-export function calculateStatistics(dados: CustodiadoData[]) {
+export function calculateStatistics(dados: PessoaMonitoradaData[]) {
   const hoje = new Date().toISOString().split('T')[0];
   
   return {
@@ -394,7 +394,7 @@ export function calculateStatistics(dados: CustodiadoData[]) {
 /**
  * Exportar com estatísticas
  */
-export function exportWithStatistics(dados: CustodiadoData[], options: ExportOptions = {}) {
+export function exportWithStatistics(dados: PessoaMonitoradaData[], options: ExportOptions = {}) {
   const stats = calculateStatistics(dados);
   
   console.log('Estatísticas da exportação:', stats);

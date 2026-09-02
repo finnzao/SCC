@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { httpClient } from '@/lib/http/client';
-import type { ExportarCustodiadosParams } from '@/types/pagination';
+import type { ExportarPessoasMonitoradasParams } from '@/types/pagination';
 
 // ── Interface de resultado da exportação ────────────────────
 
@@ -20,14 +20,14 @@ export interface ExportResult {
  *
  * @example
  * ```tsx
- * const resultado = await exportarCustodiadosExcel({
+ * const resultado = await exportarPessoasMonitoradasExcel({
  *   nome: 'Maria',
  *   status: 'INADIMPLENTE'
  * });
  * ```
  */
-export async function exportarCustodiadosExcel(
-  filtros?: ExportarCustodiadosParams
+export async function exportarPessoasMonitoradasExcel(
+  filtros?: ExportarPessoasMonitoradasParams
 ): Promise<ExportResult> {
   try {
     // Montar query params apenas com filtros que têm valor
@@ -35,6 +35,7 @@ export async function exportarCustodiadosExcel(
     if (filtros?.nome) params.set('nome', filtros.nome);
     if (filtros?.cpf) params.set('cpf', filtros.cpf);
     if (filtros?.status) params.set('status', filtros.status);
+    if (filtros?.natureza) params.set('natureza', filtros.natureza);
     if (filtros?.comarca) params.set('comarca', filtros.comarca);
     if (filtros?.ordenarPor) params.set('ordenarPor', filtros.ordenarPor);
     if (filtros?.direcao) params.set('direcao', filtros.direcao);
@@ -78,13 +79,13 @@ export async function exportarCustodiadosExcel(
  * @param exportFallbackFn Função legada de exportação client-side
  */
 export async function exportarComFallback(
-  filtros?: ExportarCustodiadosParams,
+  filtros?: ExportarPessoasMonitoradasParams,
   dadosFallback?: unknown[],
   exportFallbackFn?: (dados: unknown[], filtrados: unknown[]) => { success: boolean; message: string }
 ): Promise<ExportResult> {
   try {
     // Tentar exportação server-side primeiro
-    const resultado = await exportarCustodiadosExcel(filtros);
+    const resultado = await exportarPessoasMonitoradasExcel(filtros);
 
     if (resultado.success) {
       return resultado;

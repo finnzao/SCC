@@ -77,7 +77,7 @@ function formatTipoValidacao(tipo: string): string {
 export function convertHistoricoToSheetData(dados: ComparecimentoResponse[]) {
   return dados.map((item, index) => ({
     '#': index + 1,
-    'Custodiado': item.custodiadoNome || 'Não informado',
+    'Pessoa Monitorada': item.custodiadoNome || 'Não informado',
     'Data': dateUtils.formatToBR(item.dataComparecimento),
     'Hora': dateUtils.formatTimeToBR(item.horaComparecimento),
     'Tipo': formatTipoValidacao(item.tipoValidacao),
@@ -121,7 +121,7 @@ export function formatHistoricoWorksheet(worksheet: XLSX.WorkSheet, dataLength: 
   // Definir larguras das colunas
   const colWidths = [
     { wch: 5 },   // #
-    { wch: 35 },  // Custodiado
+    { wch: 35 },  // Pessoa Monitorada
     { wch: 12 },  // Data
     { wch: 10 },  // Hora
     { wch: 18 },  // Tipo

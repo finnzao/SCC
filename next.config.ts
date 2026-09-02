@@ -3,12 +3,7 @@ import type { NextConfig } from "next";
 // Origem do backend — variável de SERVIDOR (sem NEXT_PUBLIC_): nunca vai para o browser.
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8080";
 
-/**
- * CSP: 'unsafe-inline'/'unsafe-eval' em script-src são necessários para o runtime do Next
- * sem plumbing de nonce. O ganho real aqui está em connect-src 'self' (bloqueia exfiltração
- * para origem externa — o que funciona porque a API agora é mesma origem via rewrite),
- * frame-ancestors 'none' (clickjacking), object-src 'none' e form-action 'self'.
- */
+// unsafe-inline/eval: exigidos pelo runtime do Next sem nonce
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
@@ -25,12 +20,7 @@ const CSP = [
 const nextConfig: NextConfig = {
   output: "standalone",
 
-  /**
-   * Proxy same-origin. Sem isto o cookie httpOnly emitido pelo backend ficaria no domínio
-   * DELE — e o middleware, que roda no domínio do frontend, não conseguiria lê-lo.
-   * Com o rewrite, o browser vê tudo como mesma origem: o cookie é gravado aqui, o
-   * middleware valida, o CORS deixa de existir e SameSite=Lax passa a proteger contra CSRF.
-   */
+  // proxy same-origin: o cookie httpOnly precisa nascer no dominio do frontend
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` }];
   },
@@ -45,7 +35,6 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          // Ignorado pelo browser em http, então é inócuo em dev e ativo em produção.
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         ],
       },

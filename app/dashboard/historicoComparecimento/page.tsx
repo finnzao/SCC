@@ -439,7 +439,7 @@ function HistoricoPage() {
               <table className="w-full min-w-[650px] table-auto">
                 <thead className="bg-primary text-white">
                   <tr>
-                    <th className="p-3 text-left">Custodiado</th>
+                    <th className="p-3 text-left">Pessoa Monitorada</th>
                     <th className="p-3 text-left w-56">Processo</th>
                     <th className="p-3 text-center w-28">Data</th>
                     <th className="p-3 text-center w-20">Hora</th>

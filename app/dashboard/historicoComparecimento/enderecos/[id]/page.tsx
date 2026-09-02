@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useHistoricoEndereco } from '@/hooks/useHistoricoEndereco';
 import { custodiadosService } from '@/lib/api/services';
-import type { CustodiadoData } from '@/types/api';
+import type { PessoaMonitoradaData } from '@/types/api';
 import {
   ArrowLeft,
   MapPin,
@@ -25,12 +25,12 @@ function HistoricoEnderecosContent() {
   const custodiadoId = parseInt(params.id as string);
 
   const { historico, loading, error, buscarHistorico, enderecoAtual, totalEnderecos } = useHistoricoEndereco();
-  const [custodiado, setCustodiado] = useState<CustodiadoData | null>(null);
-  const [loadingCustodiado, setLoadingCustodiado] = useState(true);
+  const [custodiado, setCustodiado] = useState<PessoaMonitoradaData | null>(null);
+  const [loadingPessoaMonitorada, setLoadingPessoaMonitorada] = useState(true);
 
   const carregarDados = useCallback(async () => {
     try {
-      setLoadingCustodiado(true);
+      setLoadingPessoaMonitorada(true);
 
       const response = await custodiadosService.buscarPorId(custodiadoId);
 
@@ -42,7 +42,7 @@ function HistoricoEnderecosContent() {
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
-      setLoadingCustodiado(false);
+      setLoadingPessoaMonitorada(false);
     }
   }, [custodiadoId, buscarHistorico]);
 
@@ -64,7 +64,7 @@ function HistoricoEnderecosContent() {
     return new Date(data).toLocaleDateString('pt-BR');
   };
 
-  if (loading || loadingCustodiado) {
+  if (loading || loadingPessoaMonitorada) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-5xl mx-auto">

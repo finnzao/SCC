@@ -32,6 +32,11 @@ export default function DashboardPage() {
       percentualInadimplencia: resumo.percentualInadimplencia ?? 0,
       totalComparecimentos: resumo.totalComparecimentos ?? 0,
       comparecimentosEsteMes: resumo.comparecimentosEsteMes ?? 0,
+      foragidos: resumo.foragidos ?? 0,
+      cautelares: resumo.processosCautelar ?? 0,
+      execucoes: resumo.processosExecucao ?? 0,
+      aguardandoJustificacao: resumo.execucoesAguardandoJustificacao ?? 0,
+      proximasExtincao: resumo.execucoesProximasExtincao ?? 0,
     };
   }, [resumo, loadingResumo]);
 

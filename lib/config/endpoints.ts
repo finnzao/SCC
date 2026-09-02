@@ -31,18 +31,18 @@ export const ENDPOINTS = {
     HEALTH: '/verificacao/health',
   },
 
-  // Custodiados Controller
+  // Pessoas Monitoradas Controller
   CUSTODIADOS: {
-    BASE: '/custodiados',
-    LIST: '/custodiados',
-    CREATE: '/custodiados',
-    BY_ID: (id: number) => `/custodiados/${id}`,
-    UPDATE: (id: number) => `/custodiados/${id}`,
-    DELETE: (id: number) => `/custodiados/${id}`,
-    BY_PROCESSO: (processo: string) => `/custodiados/processo/${encodeURIComponent(processo)}`,
-    BY_STATUS: (status: string) => `/custodiados/status/${status}`,
-    INADIMPLENTES: '/custodiados/inadimplentes',
-    BUSCAR: (termo: string) => `/custodiados/buscar?termo=${encodeURIComponent(termo)}`,
+    BASE: '/pessoas-monitoradas',
+    LIST: '/pessoas-monitoradas',
+    CREATE: '/pessoas-monitoradas',
+    BY_ID: (id: number) => `/pessoas-monitoradas/${id}`,
+    UPDATE: (id: number) => `/pessoas-monitoradas/${id}`,
+    DELETE: (id: number) => `/pessoas-monitoradas/${id}`,
+    BY_PROCESSO: (processo: string) => `/pessoas-monitoradas/processo/${encodeURIComponent(processo)}`,
+    BY_STATUS: (status: string) => `/pessoas-monitoradas/status/${status}`,
+    INADIMPLENTES: '/pessoas-monitoradas/inadimplentes',
+    BUSCAR: (termo: string) => `/pessoas-monitoradas/buscar?termo=${encodeURIComponent(termo)}`,
   },
 
   // Comparecimentos Controller

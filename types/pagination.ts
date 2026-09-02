@@ -25,12 +25,13 @@ export interface RespostaPaginada<T> {
 
 // ── Parâmetros de requisição para custodiados ───────────────
 
-export interface CustodiadosPaginadosParams {
+export interface PessoasMonitoradasPaginadosParams {
   page: number;
   size: number;
   nome?: string;
   cpf?: string;
   status?: string;
+  natureza?: 'CAUTELAR' | 'EXECUCAO';
   ordenarPor?: 'nome' | 'status' | 'proximoComparecimento' | 'ultimoComparecimento';
   direcao?: 'asc' | 'desc';
 }
@@ -49,10 +50,11 @@ export interface ComparecimentosPaginadosParams {
 
 // ── Parâmetros de exportação ────────────────────────────────
 
-export interface ExportarCustodiadosParams {
+export interface ExportarPessoasMonitoradasParams {
   nome?: string;
   cpf?: string;
   status?: string;
+  natureza?: string;
   comarca?: string;
   ordenarPor?: string;
   direcao?: string;

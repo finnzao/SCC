@@ -9,6 +9,11 @@ export interface DashboardStats {
   percentualInadimplencia: number;
   totalComparecimentos: number;
   comparecimentosEsteMes: number;
+  cautelares: number;
+  execucoes: number;
+  foragidos: number;
+  aguardandoJustificacao: number;
+  proximasExtincao: number;
 }
 
 export interface TendenciaData {
@@ -30,6 +35,11 @@ export const EMPTY_STATS: DashboardStats = {
   percentualInadimplencia: 0,
   totalComparecimentos: 0,
   comparecimentosEsteMes: 0,
+  cautelares: 0,
+  execucoes: 0,
+  foragidos: 0,
+  aguardandoJustificacao: 0,
+  proximasExtincao: 0,
 };
 
 export function createFilterLink(params: Record<string, string>): string {

@@ -9,13 +9,16 @@ import {
   ArrowLeft, UserCheck, Edit, MapPin, Phone, FileText,
   Calendar, History, Loader2, AlertCircle, RefreshCw,
   Scale, Clock, Hash, AlertTriangle, CheckCircle, Info,
-  ChevronDown, ChevronRight, Plus, X
+  ChevronDown, ChevronRight, Plus, X, UserX, Trash2, Gavel
 } from 'lucide-react';
 import { httpClient } from '@/lib/http/client';
+import { custodiadosService } from '@/lib/api/services';
+import { execucaoService } from '@/services/execucaoService';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { useToastHelpers } from '@/components/Toast';
 import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 import { FormattingCPF as formatCPF, FormattingPhone as formatPhone } from '@/lib/utils/formatting';
-import EditarCustodiadoModal from '@/components/EditarCustodiado';
+import EditarPessoaMonitoradaModal from '@/components/EditarPessoaMonitorada';
 import EditarProcessoModal from '@/components/EditarProcessoModal';
 import ProcessoForm from '@/components/ProcessoForm';
 import ProcessoActions from '@/components/ProcessoActions';
@@ -23,7 +26,7 @@ import { usePermissions } from '@/contexts/AuthContext';
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
 import type { Processo } from '@/types/processo';
 
-interface CustodiadoResponse {
+interface PessoaMonitoradaResponse {
   id: string;
   numericId?: number;
   nome: string;
@@ -46,6 +49,8 @@ interface CustodiadoResponse {
   observacoes: string | null;
   inadimplente: boolean;
   comparecimentoHoje: boolean;
+  situacao?: 'ATIVO' | 'ARQUIVADO' | 'FORAGIDO';
+  motivoArquivamento?: string | null;
   endereco: {
     id: number; cep: string; logradouro: string; numero: string | null;
     complemento: string | null; bairro: string; cidade: string; estado: string;
@@ -132,7 +137,7 @@ function ProcessoDetailPanel({ processo, onClose }: { processo: Processo; onClos
   );
 }
 
-function CustodiadoDetalhesPage() {
+function PessoaMonitoradaDetalhesPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParamsSafe();
@@ -140,7 +145,7 @@ function CustodiadoDetalhesPage() {
   const { isAdmin } = usePermissions();
   const custodiadoUuid = params.id as string;
 
-  const [custodiado, setCustodiado] = useState<CustodiadoResponse | null>(null);
+  const [custodiado, setCustodiado] = useState<PessoaMonitoradaResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [numericId, setNumericId] = useState<number | null>(null);
@@ -153,14 +158,19 @@ function CustodiadoDetalhesPage() {
   const [loadingComparecimentos, setLoadingComparecimentos] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showProcessoForm, setShowProcessoForm] = useState(false);
+  const [acaoAdmin, setAcaoAdmin] = useState<'ARQUIVAR' | 'FORAGIDO' | null>(null);
+  const [motivoForagido, setMotivoForagido] = useState('');
+  const [motivoArquivamento, setMotivoArquivamento] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const carregarDados = useCallback(async () => {
     if (!custodiadoUuid) { setError('ID inválido'); setLoading(false); return; }
     setLoading(true); setError(null);
     try {
-      const resp = await httpClient.get<any>(`/custodiados/${custodiadoUuid}`);
+      const resp = await httpClient.get<any>(`/pessoas-monitoradas/${custodiadoUuid}`);
       const data = resp.success ? (resp.data?.data || resp.data) : null;
-      if (!data) { setError('Custodiado não encontrado'); setCustodiado(null); return; }
+      if (!data) { setError('Pessoa Monitorada não encontrada'); setCustodiado(null); return; }
       setCustodiado(data);
       const rid = data.numericId || (typeof data.id === 'number' ? data.id : null);
       if (rid && typeof rid === 'number') { setNumericId(rid); }
@@ -194,10 +204,46 @@ function CustodiadoDetalhesPage() {
     else router.push(`/dashboard/comparecimento/confirmar?custodiadoId=${custodiado.id}`);
   };
 
-  const handleEditCustodiadoSave = () => { setShowEditModal(false); carregarDados(); };
+  const handleEditPessoaMonitoradaSave = () => { setShowEditModal(false); carregarDados(); };
   const handleProcessoSaved = () => { setProcessoEditando(null); carregarProcessos(); carregarDados(); };
   const handleProcessoCreated = () => { setShowProcessoForm(false); carregarProcessos(); carregarDados(); };
   const handleProcessoActionComplete = () => { carregarProcessos(); carregarDados(); };
+
+  const handleDeclararForagido = async () => {
+    if (!motivoForagido.trim()) { showError('Motivo obrigatório', 'Descreva o motivo da declaração.'); return; }
+    const r = await custodiadosService.declararForagido(custodiadoUuid, motivoForagido.trim());
+    if (r.success) {
+      success('Foragido declarado', 'Registro atualizado; execuções entram no rito de justificação.');
+      setAcaoAdmin(null); setMotivoForagido('');
+      carregarDados();
+    } else showError('Erro', r.message || 'Erro ao declarar foragido');
+  };
+
+  const handleReativar = async () => {
+    const r = await custodiadosService.reativar(custodiadoUuid);
+    if (r.success) { success('Reativado', 'Pessoa Monitorada voltou ao acompanhamento ativa.'); carregarDados(); }
+    else showError('Erro', r.message || 'Erro ao reativar');
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const r = await custodiadosService.excluir(custodiadoUuid, motivoArquivamento || undefined);
+      if (r.success) {
+        success('Arquivado', 'O custodiado foi arquivado com sucesso.');
+        setTimeout(() => router.push('/dashboard/geral'), 1200);
+      } else throw new Error(r.message || 'Erro ao arquivar');
+    } catch (err) {
+      showError('Erro', err instanceof Error ? err.message : 'Erro desconhecido');
+    } finally { setIsDeleting(false); setShowDeleteDialog(false); }
+  };
+
+  const handleVerExecucao = async (processoId: number) => {
+    const r = await execucaoService.buscarPorProcesso(processoId);
+    const exec = (r as any)?.data?.data || (r as any)?.data;
+    if (r.success && exec?.id) router.push(`/dashboard/execucoes/${exec.id}`);
+    else showError('Execução não encontrada', 'A pena deste processo ainda não foi registrada.');
+  };
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6"><div className="max-w-5xl mx-auto space-y-6">
@@ -211,7 +257,7 @@ function CustodiadoDetalhesPage() {
       <button onClick={() => router.push('/dashboard/geral')} className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"><ArrowLeft className="w-5 h-5" /><span>Voltar</span></button>
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
         <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
-        <div><h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados</h3><p className="text-red-600 mb-4">{error || 'Custodiado não encontrado'}</p>
+        <div><h3 className="text-red-800 font-semibold mb-2">Erro ao carregar dados</h3><p className="text-red-600 mb-4">{error || 'Pessoa Monitorada não encontrada'}</p>
           <button onClick={carregarDados} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"><RefreshCw className="w-4 h-4" />Tentar Novamente</button></div>
       </div>
     </div>
@@ -226,6 +272,10 @@ function CustodiadoDetalhesPage() {
   const isConformidade = statusGeral === 'EM_CONFORMIDADE';
   const totalAtivos = processosAtivos.length;
   const totalInadimplentes = processosAtivos.filter(p => p.inadimplente).length;
+  const temExecucao = processosAtivos.some(p => p.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO');
+  const temCautelar = processosAtivos.some(p => p.naturezaVinculo !== 'EXECUCAO_REGIME_ABERTO');
+  const naturezaFicha = temExecucao && temCautelar ? 'Cautelar + Execução' : temExecucao ? 'Execução de pena' : 'Medida cautelar';
+  const situacaoAtual = c.situacao || 'ATIVO';
 
   const renderProcessoCard = (proc: Processo, faded: boolean = false) => {
     const procAtrasado = proc.proximoComparecimento ? isOverdue(proc.proximoComparecimento) : false;
@@ -245,6 +295,12 @@ function CustodiadoDetalhesPage() {
                   {proc.numeroProcesso}
                 </button>
                 {isAtivo ? <StatusBadgeInline status={proc.status} diasAtraso={proc.diasAtraso} /> : <SituacaoBadge situacao={proc.situacaoProcesso} />}
+                {proc.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO' ? (
+                  <span className="px-2 py-0.5 rounded-md text-xs font-medium border bg-violet-50 text-violet-700 border-violet-200 flex items-center gap-1">
+                    <Gavel className="w-3 h-3" />Execução de pena</span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-md text-xs font-medium border bg-sky-50 text-sky-700 border-sky-200">Cautelar</span>
+                )}
               </div>
               <p className="text-sm text-gray-500">{proc.vara} · {proc.comarca}</p>
               {isAtivo && (
@@ -259,6 +315,12 @@ function CustodiadoDetalhesPage() {
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+              {proc.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO' && (
+                <button onClick={() => handleVerExecucao(proc.id)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
+                  <Gavel className="w-3.5 h-3.5" />Ver execução
+                </button>
+              )}
               {isAdmin() && (
                 <button onClick={() => setProcessoEditando(proc)}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
@@ -300,18 +362,74 @@ function CustodiadoDetalhesPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-3">
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 backdrop-blur-sm">{isConformidade ? 'EM CONFORMIDADE' : 'INADIMPLENTE'}</span>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/30 backdrop-blur-sm flex items-center gap-1.5">
+                    {temExecucao && <Gavel className="w-3 h-3" />}{naturezaFicha.toUpperCase()}
+                  </span>
                   {totalAtivos > 0 && (<span className="px-3 py-1 rounded-full text-xs font-medium bg-white/10 backdrop-blur-sm">{totalAtivos} processo{totalAtivos !== 1 ? 's' : ''} ativo{totalAtivos !== 1 ? 's' : ''}{totalInadimplentes > 0 && ` · ${totalInadimplentes} inadimplente${totalInadimplentes !== 1 ? 's' : ''}`}</span>)}
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 flex-shrink-0 flex-wrap">
                 <button onClick={() => handleRegistrar()} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-all">
                   <UserCheck className="w-4 h-4" /><span className="hidden sm:inline">Registrar</span></button>
                 <button onClick={() => setShowEditModal(true)} className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-all">
                   <Edit className="w-4 h-4" /><span className="hidden sm:inline">Editar Pessoa</span></button>
+                {isAdmin() && (situacaoAtual === 'ATIVO' ? (
+                  <>
+                    <button onClick={() => setAcaoAdmin(a => a === 'FORAGIDO' ? null : 'FORAGIDO')}
+                      className="flex items-center gap-2 bg-gray-900/40 hover:bg-gray-900/60 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-all">
+                      <UserX className="w-4 h-4" /><span className="hidden sm:inline">Foragido</span></button>
+                    <button onClick={() => setAcaoAdmin(a => a === 'ARQUIVAR' ? null : 'ARQUIVAR')} disabled={isDeleting}
+                      className="flex items-center gap-2 bg-red-500/30 hover:bg-red-500/50 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-all disabled:opacity-50">
+                      <Trash2 className="w-4 h-4" /><span className="hidden sm:inline">Arquivar</span></button>
+                  </>
+                ) : (
+                  <button onClick={handleReativar}
+                    className="flex items-center gap-2 bg-green-500/30 hover:bg-green-500/50 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-all">
+                    <UserCheck className="w-4 h-4" /><span className="hidden sm:inline">Reativar</span></button>
+                ))}
               </div>
             </div>
           </div>
+          {situacaoAtual === 'FORAGIDO' && (
+            <div className="bg-gray-900 text-white text-center py-2 text-sm font-semibold tracking-wide">
+              FORAGIDO — fora dos contadores de atraso até reativação
+            </div>
+          )}
         </div>
+
+        {acaoAdmin === 'FORAGIDO' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 space-y-2">
+            <p className="text-sm font-semibold text-amber-900">Declarar foragido — ato manual, com motivo obrigatório</p>
+            <textarea value={motivoForagido} onChange={e => setMotivoForagido(e.target.value)} maxLength={300} rows={2}
+              placeholder="Ex.: diligências frustradas em 3 endereços; mandado expedido em..."
+              className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm" />
+            <div className="flex gap-2">
+              <button onClick={handleDeclararForagido}
+                className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800">Confirmar declaração</button>
+              <button onClick={() => setAcaoAdmin(null)} className="border px-4 py-2 rounded-lg text-sm bg-white">Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {acaoAdmin === 'ARQUIVAR' && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 space-y-2">
+            <p className="text-sm font-semibold text-red-900">Arquivar — informe o motivo</p>
+            <select value={motivoArquivamento} onChange={e => setMotivoArquivamento(e.target.value)}
+              className="w-full sm:w-96 border border-red-300 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">Selecione o motivo...</option>
+              <option value="OBITO_COMPROVADO">Óbito comprovado</option>
+              <option value="PRISAO_OUTRO_PROCESSO">Prisão por outro processo</option>
+              <option value="DECISAO_JUDICIAL">Decisão judicial</option>
+              <option value="EXTINCAO_PUNIBILIDADE">Extinção da punibilidade</option>
+              <option value="OUTRO">Outro</option>
+            </select>
+            <div className="flex gap-2">
+              <button onClick={() => { if (!motivoArquivamento) { showError('Motivo obrigatório', 'Selecione o motivo do arquivamento.'); return; } setShowDeleteDialog(true); }}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">Arquivar</button>
+              <button onClick={() => setAcaoAdmin(null)} className="border px-4 py-2 rounded-lg text-sm bg-white">Cancelar</button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-5">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -404,7 +522,7 @@ function CustodiadoDetalhesPage() {
       </div>
 
       {showEditModal && custodiado && (
-        <EditarCustodiadoModal
+        <EditarPessoaMonitoradaModal
           dados={{
             id: numericId || c.id, nome: c.nome, cpf: c.cpf, rg: c.rg, contato: c.contato,
             processo: c.processo, vara: c.vara, comarca: c.comarca, dataDecisao: c.dataDecisao,
@@ -415,7 +533,7 @@ function CustodiadoDetalhesPage() {
             endereco: c.endereco || { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '' },
             observacoes: c.observacoes
           } as any}
-          onClose={() => setShowEditModal(false)} onVoltar={() => setShowEditModal(false)} onSave={handleEditCustodiadoSave} />
+          onClose={() => setShowEditModal(false)} onVoltar={() => setShowEditModal(false)} onSave={handleEditPessoaMonitoradaSave} />
       )}
 
       {processoEditando && (
@@ -426,8 +544,24 @@ function CustodiadoDetalhesPage() {
         <ProcessoForm custodiadoId={numericId} custodiadoNome={c.nome}
           onClose={() => setShowProcessoForm(false)} onSuccess={handleProcessoCreated} />
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleConfirmDelete}
+        type="danger"
+        title="Confirmar Arquivamento"
+        message={`Tem certeza que deseja arquivar o registro de ${c.nome}?`}
+        details={[
+          `CPF: ${c.cpf ? formatCPF(c.cpf) : 'Não informado'}`,
+          `Vínculo: ${naturezaFicha}`,
+          'O registro será arquivado, não excluído permanentemente.'
+        ]}
+        confirmText="Sim, Arquivar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }
 
-export default withSearchParams(CustodiadoDetalhesPage);
+export default withSearchParams(PessoaMonitoradaDetalhesPage);

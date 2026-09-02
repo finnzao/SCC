@@ -2,10 +2,11 @@
 'use client';
 
 import { useState } from 'react';
-import { XCircle, PauseCircle, PlayCircle } from 'lucide-react';
+import { XCircle, PauseCircle, PlayCircle, Gavel } from 'lucide-react';
 import { useProcessos } from '@/hooks/useProcessos';
 import { useToast } from '@/components/Toast';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { RegistroPenaForm } from '@/components/RegistroPenaForm';
 import type { Processo } from '@/types/processo';
 
 interface ProcessoActionsProps {
@@ -19,6 +20,7 @@ export default function ProcessoActions({ processo, onActionComplete, compact = 
   const { showToast } = useToast();
 
   const [confirmAction, setConfirmAction] = useState<'encerrar' | 'suspender' | 'reativar' | null>(null);
+  const [showRegistroPena, setShowRegistroPena] = useState(false);
 
   const handleEncerrar = async () => {
     const result = await encerrar(processo.id);
@@ -64,6 +66,19 @@ export default function ProcessoActions({ processo, onActionComplete, compact = 
   return (
     <>
       <div className={compact ? 'flex gap-1' : 'flex gap-2 flex-wrap'}>
+        {/* so execucao ATIVA; duplicidade o backend recusa (1:1) */}
+        {isAtivo && processo.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO' && (
+          <button
+            onClick={() => setShowRegistroPena(true)}
+            disabled={loading}
+            className={`${buttonBase} bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors disabled:opacity-50`}
+            title="Registrar pena (execução)"
+          >
+            <Gavel className={compact ? 'w-3 h-3' : 'w-4 h-4'} />
+            {!compact && 'Registrar pena'}
+          </button>
+        )}
+
         {/* Encerrar - só quando ATIVO */}
         {isAtivo && (
           <button
@@ -113,7 +128,7 @@ export default function ProcessoActions({ processo, onActionComplete, compact = 
         title="Encerrar Processo"
         message={`Deseja encerrar o processo ${processo.numeroProcesso}? O processo não aparecerá mais na listagem ativa.`}
         details={[
-          `Custodiado: ${processo.custodiadoNome}`,
+          `Pessoa Monitorada: ${processo.custodiadoNome}`,
           `Vara: ${processo.vara}`,
           `Comarca: ${processo.comarca}`,
         ]}
@@ -130,7 +145,7 @@ export default function ProcessoActions({ processo, onActionComplete, compact = 
         title="Suspender Processo"
         message={`Deseja suspender temporariamente o processo ${processo.numeroProcesso}?`}
         details={[
-          `Custodiado: ${processo.custodiadoNome}`,
+          `Pessoa Monitorada: ${processo.custodiadoNome}`,
           'O processo poderá ser reativado posteriormente.',
         ]}
         confirmText="Sim, Suspender"
@@ -146,13 +161,23 @@ export default function ProcessoActions({ processo, onActionComplete, compact = 
         title="Reativar Processo"
         message={`Deseja reativar o processo ${processo.numeroProcesso}?`}
         details={[
-          `Custodiado: ${processo.custodiadoNome}`,
+          `Pessoa Monitorada: ${processo.custodiadoNome}`,
           `Situação atual: ${processo.situacaoProcesso}`,
           'O processo voltará a aparecer na listagem ativa.',
         ]}
         confirmText="Sim, Reativar"
         cancelText="Cancelar"
       />
+
+      {/* Registro de pena (fase 2 — regime aberto) */}
+      {showRegistroPena && (
+        <RegistroPenaForm
+          processoId={processo.id}
+          numeroProcesso={processo.numeroProcesso}
+          onClose={() => setShowRegistroPena(false)}
+          onSuccess={() => onActionComplete?.()}
+        />
+      )}
     </>
   );
 }

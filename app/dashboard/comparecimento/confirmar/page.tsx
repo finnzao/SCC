@@ -16,7 +16,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-import { CustodiadoData, TipoValidacao } from '@/types/api';
+import { PessoaMonitoradaData, TipoValidacao } from '@/types/api';
 import type { Processo } from '@/types/processo';
 import EnderecoForm from '@/components/EnderecoForm';
 import { useSearchParamsSafe, withSearchParams } from '@/hooks/useSearchParamsSafe';
@@ -94,7 +94,7 @@ function ConfirmarPresencaPage() {
 
   const h = useConfirmarPresenca({ processoParam, processoIdParam, custodiadoIdParam });
 
-  if (h.loadingCustodiados && !processoIdParam && !custodiadoIdParam) {
+  if (h.loadingPessoasMonitoradas && !processoIdParam && !custodiadoIdParam) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -105,12 +105,12 @@ function ConfirmarPresencaPage() {
     );
   }
 
-  if (h.errorCustodiados && !processoIdParam && !custodiadoIdParam) {
+  if (h.errorPessoasMonitoradas && !processoIdParam && !custodiadoIdParam) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md">
           <h3 className="text-red-800 font-semibold mb-2 flex items-center gap-2"><XCircle className="w-5 h-5" />Erro ao carregar dados</h3>
-          <p className="text-red-600 mb-4">{h.errorCustodiados}</p>
+          <p className="text-red-600 mb-4">{h.errorPessoasMonitoradas}</p>
           <button onClick={() => h.refetch()} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Tentar Novamente</button>
         </div>
       </div>
@@ -191,7 +191,7 @@ function ConfirmarPresencaPage() {
                   {h.mostrarResultados && h.resultadosBusca.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-gray-500">{h.resultadosBusca.length} resultado(s):</p>
-                      {h.resultadosBusca.map((p: CustodiadoData, i: number) => (
+                      {h.resultadosBusca.map((p: PessoaMonitoradaData, i: number) => (
                         <button key={i} onClick={() => h.selecionarPessoa(p)}
                           className="w-full p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50/50 transition-all text-left">
                           <div className="flex items-center justify-between">
@@ -309,6 +309,24 @@ function ConfirmarPresencaPage() {
                           <p className="text-amber-800 font-medium text-xs">Atualização de endereço necessária</p>
                         </div>
                         <EnderecoForm endereco={h.atualizacaoEndereco.endereco!} onEnderecoChange={h.handleEnderecoChange} />
+                        {(() => {
+                          // permanecer na comarca e condicao do regime aberto: avisa (nao bloqueia)
+                          const normalizar = (s?: string) =>
+                            (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                          const cidade = normalizar(h.atualizacaoEndereco.endereco?.cidade);
+                          const comarca = normalizar(h.processoSelecionado?.comarca);
+                          return cidade && comarca && cidade !== comarca ? (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mt-3 flex items-start gap-2">
+                              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <p className="text-amber-800 text-xs">
+                                O novo endereço fica em <strong>{h.atualizacaoEndereco.endereco?.cidade}</strong>,
+                                fora da comarca do processo (<strong>{h.processoSelecionado?.comarca}</strong>).
+                                Permanecer na comarca pode ser condição do regime — confira se a mudança
+                                foi autorizada pelo juízo.
+                              </p>
+                            </div>
+                          ) : null;
+                        })()}
                         <div className="mt-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1.5">Motivo da alteração *</label>
                           <textarea value={h.atualizacaoEndereco.motivoAlteracao || ''}
@@ -348,7 +366,14 @@ function ConfirmarPresencaPage() {
                           <option value={TipoValidacao.PRESENCIAL}>Presencial</option>
                           <option value={TipoValidacao.ONLINE}>Balcão Virtual</option>
                           <option value={TipoValidacao.CADASTRO_INICIAL}>Cadastro Inicial</option>
+                          <option value={TipoValidacao.FALTA_JUSTIFICADA}>Falta Justificada</option>
                         </select>
+                        {h.formulario.tipoValidacao === TipoValidacao.FALTA_JUSTIFICADA && (
+                          <p className="text-xs text-amber-700 mt-1.5 bg-amber-50 rounded p-2">
+                            Não conta presença: adia o próximo comparecimento a partir da data da
+                            falta. A justificativa em observações é obrigatória.
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Validado por *</label>
@@ -368,6 +393,12 @@ function ConfirmarPresencaPage() {
                             onChange={(e) => h.handleInputChange('dataComparecimento', e.target.value)}
                             className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
                         </div>
+                        {h.formulario.dataComparecimento &&
+                          Date.now() - new Date(h.formulario.dataComparecimento + 'T00:00:00').getTime() > 30 * 86400000 && (
+                          <p className="text-xs text-amber-700 mt-1.5 bg-amber-50 rounded p-2">
+                            Registro retroativo de mais de 30 dias — confira a data antes de salvar.
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Horário *</label>

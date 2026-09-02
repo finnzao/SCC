@@ -45,14 +45,8 @@ function base64UrlParaBytes(input: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-/**
- * Verifica assinatura HS256 + expiração. Antes daqui só se checava se o cookie EXISTIA,
- * então `document.cookie='auth-token=x'` no console já liberava o /dashboard.
- *
- * O algoritmo é fixado em HS256 e o campo `alg` do cabeçalho NUNCA é usado para escolher
- * a verificação — é assim que se evita algorithm confusion (`alg: none`, troca HS/RS).
- * Web Crypto é nativo no runtime Edge: nenhuma dependência nova.
- */
+// Verifica HS256 + exp com Web Crypto. Algoritmo fixado: o alg do header
+// nunca escolhe a verificacao (evita algorithm confusion).
 async function tokenValido(token: string, secret: string): Promise<boolean> {
   const partes = token.split('.');
   if (partes.length !== 3) return false;
@@ -80,7 +74,7 @@ async function tokenValido(token: string, secret: string): Promise<boolean> {
     const { exp } = JSON.parse(decoder.decode(base64UrlParaBytes(payload)));
     return typeof exp === 'number' && exp * 1000 > Date.now();
   } catch {
-    return false; // token malformado é token inválido
+    return false;
   }
 }
 
@@ -97,8 +91,7 @@ export async function middleware(req: NextRequest) {
 
     const secret = process.env.JWT_SECRET;
     if (!secret) {
-      // Fail-closed de propósito: sem o segredo não há o que verificar, e degradar para
-      // "deixa passar" recriaria em silêncio exatamente a falha que este arquivo corrige.
+      // fail-closed: sem segredo nao ha verificacao possivel
       console.error('[middleware] JWT_SECRET não configurado — /dashboard bloqueado.');
       return NextResponse.redirect(new URL('/login', req.url));
     }

@@ -11,10 +11,10 @@ import {
   testService
 } from '@/lib/api/services';
 import {
-  CustodiadoResponse,
+  PessoaMonitoradaResponse,
   ComparecimentoResponse,
   UsuarioResponse,
-  CustodiadoDTO,
+  PessoaMonitoradaDTO,
   ComparecimentoDTO,
   UsuarioDTO,
   PeriodoParams,
@@ -24,28 +24,28 @@ import {
   HealthResponse,
   AppInfoResponse,
   ResumoSistemaResponse,
-  ListarCustodiadosResponse,
-  CustodiadoData,
+  ListarPessoasMonitoradasResponse,
+  PessoaMonitoradaData,
 } from '@/types/api';
 import { StatusComparecimento } from '@/types/api';
 // Hook para custodiados
-export function useCustodiados() {
-  const [custodiados, setCustodiados] = useState<CustodiadoData[] | null>(null);
+export function usePessoasMonitoradas() {
+  const [custodiados, setCustodiados] = useState<PessoaMonitoradaData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCustodiados = async (forceRefresh = false) => {
+  const fetchPessoasMonitoradas = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log('[useCustodiados] Iniciando busca de custodiados...', { forceRefresh });
+      console.log('[usePessoasMonitoradas] Iniciando busca de custodiados...', { forceRefresh });
 
-      const response: ListarCustodiadosResponse = await custodiadosService.listar();
-      console.log('[useCustodiados] Resposta recebida:', response);
+      const response: ListarPessoasMonitoradasResponse = await custodiadosService.listar();
+      console.log('[usePessoasMonitoradas] Resposta recebida:', response);
 
       if (response.success && Array.isArray(response.data)) {
-        console.log('[useCustodiados] Custodiados carregados:', response.data.length);
+        console.log('[usePessoasMonitoradas] Pessoas Monitoradas carregados:', response.data.length);
         setCustodiados(response.data);
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('lastDataFetch', Date.now().toString());
@@ -55,7 +55,7 @@ export function useCustodiados() {
         setCustodiados([]);
       }
     } catch (err) {
-      console.error('[useCustodiados] Erro na requisição:', err);
+      console.error('[usePessoasMonitoradas] Erro na requisição:', err);
       setError('Erro ao conectar com o servidor');
       setCustodiados([]);
     } finally {
@@ -63,30 +63,30 @@ export function useCustodiados() {
     }
   };
 
-  // Criar Custodiado
-  const criarCustodiado = useCallback(async (data: CustodiadoDTO) => {
+  // Criar Pessoa Monitorada
+  const criarPessoaMonitorada = useCallback(async (data: PessoaMonitoradaDTO) => {
     try {
       setLoading(true);
-      console.log('[useCustodiados] Criando Custodiado:', data);
+      console.log('[usePessoasMonitoradas] Criando Pessoa Monitorada:', data);
 
       const result = await custodiadosService.criar(data);
 
       if (result.success) {
         // Atualizar lista automaticamente após criação
-        await fetchCustodiados();
+        await fetchPessoasMonitoradas();
         return {
           success: true,
-          message: result.message || 'Custodiado criado com sucesso',
+          message: result.message || 'Pessoa Monitorada criada com sucesso',
           data: result.data
         };
       }
 
       return {
         success: false,
-        message: result.message || 'Erro ao criar Custodiado'
+        message: result.message || 'Erro ao criar Pessoa Monitorada'
       };
     } catch (error: any) {
-      console.error('[useCustodiados] Erro ao criar Custodiado:', error);
+      console.error('[usePessoasMonitoradas] Erro ao criar Pessoa Monitorada:', error);
       return {
         success: false,
         message: error.message || 'Erro interno do sistema'
@@ -96,30 +96,30 @@ export function useCustodiados() {
     }
   }, []);
 
-  // Atualizar Custodiado
-  const atualizarCustodiado = useCallback(async (id: number, data: Partial<CustodiadoDTO>) => {
+  // Atualizar Pessoa Monitorada
+  const atualizarPessoaMonitorada = useCallback(async (id: number, data: Partial<PessoaMonitoradaDTO>) => {
     try {
       setLoading(true);
-      console.log(`[useCustodiados] Atualizando Custodiado ID: ${id}`, data);
+      console.log(`[usePessoasMonitoradas] Atualizando Pessoa Monitorada ID: ${id}`, data);
 
       const result = await custodiadosService.atualizar(id, data);
 
       if (result.success) {
         // Atualizar lista automaticamente após atualização
-        await fetchCustodiados();
+        await fetchPessoasMonitoradas();
         return {
           success: true,
-          message: result.message || 'Custodiado atualizado com sucesso',
+          message: result.message || 'Pessoa Monitorada atualizada com sucesso',
           data: result.data
         };
       }
 
       return {
         success: false,
-        message: result.message || 'Erro ao atualizar Custodiado'
+        message: result.message || 'Erro ao atualizar Pessoa Monitorada'
       };
     } catch (error: any) {
-      console.error('[useCustodiados] Erro ao atualizar Custodiado:', error);
+      console.error('[usePessoasMonitoradas] Erro ao atualizar Pessoa Monitorada:', error);
       return {
         success: false,
         message: error.message || 'Erro interno do sistema'
@@ -129,8 +129,8 @@ export function useCustodiados() {
     }
   }, []);
 
-  // Excluir Custodiado
-  const excluirCustodiado = useCallback(async (id: number) => {
+  // Excluir Pessoa Monitorada
+  const excluirPessoaMonitorada = useCallback(async (id: number) => {
     try {
       setLoading(true);
 
@@ -138,19 +138,19 @@ export function useCustodiados() {
 
       if (result.success) {
         // Atualizar lista automaticamente após exclusão
-        await fetchCustodiados();
+        await fetchPessoasMonitoradas();
         return {
           success: true,
-          message: result.message || 'Custodiado excluído com sucesso'
+          message: result.message || 'Pessoa Monitorada excluída com sucesso'
         };
       }
 
       return {
         success: false,
-        message: result.message || 'Erro ao excluir Custodiado'
+        message: result.message || 'Erro ao excluir Pessoa Monitorada'
       };
     } catch (error: any) {
-      console.error('[useCustodiados] Erro ao excluir Custodiado:', error);
+      console.error('[usePessoasMonitoradas] Erro ao excluir Pessoa Monitorada:', error);
       return {
         success: false,
         message: error.message || 'Erro interno do sistema'
@@ -160,26 +160,26 @@ export function useCustodiados() {
     }
   }, []);
 
-  // Buscar Custodiado por ID
+  // Buscar Pessoa Monitorada por ID
   const buscarPorId = useCallback(async (id: number) => {
     try {
-      console.log(`[useCustodiados] Buscando Custodiado ID: ${id}`);
+      console.log(`[usePessoasMonitoradas] Buscando Pessoa Monitorada ID: ${id}`);
       const result = await custodiadosService.buscarPorId(id);
       return result;
     } catch (error: any) {
-      console.error('[useCustodiados] Erro ao buscar Custodiado por ID:', error);
+      console.error('[usePessoasMonitoradas] Erro ao buscar Pessoa Monitorada por ID:', error);
       return null;
     }
   }, []);
 
-  // Buscar Custodiado por processo
+  // Buscar Pessoa Monitorada por processo
   const buscarPorProcesso = useCallback(async (processo: string) => {
     try {
-      console.log(`[useCustodiados] Buscando Custodiado por processo: ${processo}`);
+      console.log(`[usePessoasMonitoradas] Buscando Pessoa Monitorada por processo: ${processo}`);
       const result = await custodiadosService.buscarPorProcesso(processo);
       return result;
     } catch (error: any) {
-      console.error('[useCustodiados] Erro ao buscar Custodiado por processo:', error);
+      console.error('[usePessoasMonitoradas] Erro ao buscar Pessoa Monitorada por processo:', error);
       return null;
     }
   }, []);
@@ -187,11 +187,11 @@ export function useCustodiados() {
   // Buscar inadimplentes
   const buscarInadimplentes = useCallback(async () => {
     try {
-      console.log('[useCustodiados] Buscando inadimplentes');
+      console.log('[usePessoasMonitoradas] Buscando inadimplentes');
       const result = await custodiadosService.buscarInadimplentes();
       return result;
     } catch (error: any) {
-      console.error('[useCustodiados] Erro ao buscar inadimplentes:', error);
+      console.error('[usePessoasMonitoradas] Erro ao buscar inadimplentes:', error);
       return [];
     }
   }, []);
@@ -199,11 +199,11 @@ export function useCustodiados() {
   // Buscar por status
   const buscarPorStatus = useCallback(async (status: StatusComparecimento) => {
     try {
-      console.log(`[useCustodiados] Buscando por status: ${status}`);
+      console.log(`[usePessoasMonitoradas] Buscando por status: ${status}`);
       const result = await custodiadosService.buscarPorStatus(status);
       return result;
     } catch (error: any) {
-      console.error('[useCustodiados] Erro ao buscar por status:', error);
+      console.error('[usePessoasMonitoradas] Erro ao buscar por status:', error);
       return [];
     }
   }, []);
@@ -211,22 +211,22 @@ export function useCustodiados() {
   // Busca geral com parâmetros
   const buscar = useCallback(async (params: BuscarParams) => {
     try {
-      console.log('[useCustodiados] Fazendo busca com parâmetros:', params);
+      console.log('[usePessoasMonitoradas] Fazendo busca com parâmetros:', params);
       const result = await custodiadosService.buscar(params);
       return result;
     } catch (error: any) {
-      console.error('[useCustodiados] Erro na busca:', error);
+      console.error('[usePessoasMonitoradas] Erro na busca:', error);
       return [];
     }
   }, []);
 
   // Forçar atualização da lista
   const refetch = useCallback((forceRefresh = true) => {
-    return fetchCustodiados(forceRefresh);
+    return fetchPessoasMonitoradas(forceRefresh);
   }, []);
 
   useEffect(() => {
-    fetchCustodiados();
+    fetchPessoasMonitoradas();
   }, []);
 
   return {
@@ -234,9 +234,9 @@ export function useCustodiados() {
     loading,
     error,
     // Operações CRUD
-    criarCustodiado,
-    atualizarCustodiado,
-    excluirCustodiado,
+    criarPessoaMonitorada,
+    atualizarPessoaMonitorada,
+    excluirPessoaMonitorada,
     // Buscas
     buscarPorId,
     buscarPorProcesso,
@@ -553,7 +553,7 @@ export function useHealthCheck() {
 
 // Hook para Busca Geral
 export function useBusca() {
-  const [resultados, setResultados] = useState<CustodiadoResponse[]>([]);
+  const [resultados, setResultados] = useState<PessoaMonitoradaResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

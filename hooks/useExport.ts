@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useCallback } from 'react';
-import { CustodiadoData } from '@/types/api';
+import { PessoaMonitoradaData } from '@/types/api';
 import { exportFilteredData } from '@/lib/utils/excelExport';
 import type { ExportFilterInfo } from '@/lib/utils/excelExport';
 
@@ -33,8 +33,8 @@ export function useExport(options: UseExportOptions = {}) {
    * Exportar dados com opções personalizadas
    */
   const exportData = useCallback(async (
-    allData: CustodiadoData[],
-    filteredData: CustodiadoData[],
+    allData: PessoaMonitoradaData[],
+    filteredData: PessoaMonitoradaData[],
     filterInfo?: ExportFilterInfo,
     exportType: 'all' | 'filtered' = 'filtered'
   ): Promise<ExportResult> => {
@@ -91,7 +91,7 @@ export function useExport(options: UseExportOptions = {}) {
    * Exportar todos os dados
    */
   const exportAll = useCallback(async (
-    allData: CustodiadoData[]
+    allData: PessoaMonitoradaData[]
   ): Promise<ExportResult> => {
     return exportData(allData, allData, undefined, 'all');
   }, [exportData]);
@@ -100,8 +100,8 @@ export function useExport(options: UseExportOptions = {}) {
    * Exportar dados filtrados
    */
   const exportFiltered = useCallback(async (
-    allData: CustodiadoData[],
-    filteredData: CustodiadoData[],
+    allData: PessoaMonitoradaData[],
+    filteredData: PessoaMonitoradaData[],
     filterInfo?: ExportFilterInfo
   ): Promise<ExportResult> => {
     return exportData(allData, filteredData, filterInfo, 'filtered');
@@ -131,7 +131,7 @@ export function useQuickExport() {
   const [isExporting, setIsExporting] = useState(false);
 
   const quickExport = useCallback(async (
-    data: CustodiadoData[],
+    data: PessoaMonitoradaData[],
     filename?: string
   ): Promise<boolean> => {
     setIsExporting(true);

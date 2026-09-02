@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { CustodiadoData, StatusComparecimento } from '@/types/api';
+import { PessoaMonitoradaData, StatusComparecimento } from '@/types/api';
 import type { ExportData, ExportStatistics, ExportFilterInfo } from '@/types/export';
 
 /**
  * Calcula estatísticas dos dados para incluir no relatório
  */
-export function calculateExportStatistics(dados: CustodiadoData[]): ExportStatistics {
+export function calculateExportStatistics(dados: PessoaMonitoradaData[]): ExportStatistics {
     const hoje = new Date().toISOString().split('T')[0];
 
     const emConformidade = dados.filter(d => d.status === StatusComparecimento.EM_CONFORMIDADE).length;
@@ -86,7 +86,7 @@ export function generateFilename(filterInfo?: ExportFilterInfo): string {
 /**
  * Valida dados antes da exportação
  */
-export function validateExportData(dados: CustodiadoData[]): { valid: boolean; errors: string[] } {
+export function validateExportData(dados: PessoaMonitoradaData[]): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!dados || dados.length === 0) {
@@ -94,7 +94,7 @@ export function validateExportData(dados: CustodiadoData[]): { valid: boolean; e
     }
 
     // Verificar se há campos obrigatórios vazios
-    const camposObrigatorios: (keyof CustodiadoData)[] = ['nome', 'processo', 'proximoComparecimento'];
+    const camposObrigatorios: (keyof PessoaMonitoradaData)[] = ['nome', 'processo', 'proximoComparecimento'];
 
     dados.forEach((item, index) => {
         camposObrigatorios.forEach(campo => {
@@ -122,9 +122,9 @@ export function validateExportData(dados: CustodiadoData[]): { valid: boolean; e
 
 /**
  * Transforma dados para formato de exportação com validação
- * Retorna CustodiadoData com campos calculados adicionados
+ * Retorna PessoaMonitoradaData com campos calculados adicionados
  */
-export function transformDataForExport(dados: CustodiadoData[]): ExportData[] {
+export function transformDataForExport(dados: PessoaMonitoradaData[]): ExportData[] {
     return dados.map((item) => {
         const hoje = new Date();
         
@@ -277,7 +277,7 @@ export function estimateExportTime(dataLength: number): string {
 /**
  * Limpa e normaliza dados antes da exportação
  */
-export function sanitizeExportData(dados: CustodiadoData[]): CustodiadoData[] {
+export function sanitizeExportData(dados: PessoaMonitoradaData[]): PessoaMonitoradaData[] {
     return dados.map(item => ({
         ...item,
         nome: String(item.nome || '').trim(),
@@ -293,7 +293,7 @@ export function sanitizeExportData(dados: CustodiadoData[]): CustodiadoData[] {
 /**
  * Agrupa dados por status para análise
  */
-export function groupByStatus(dados: CustodiadoData[]): Record<string, CustodiadoData[]> {
+export function groupByStatus(dados: PessoaMonitoradaData[]): Record<string, PessoaMonitoradaData[]> {
     return dados.reduce((acc, item) => {
         const status = item.status || 'sem_status';
         if (!acc[status]) {
@@ -301,7 +301,7 @@ export function groupByStatus(dados: CustodiadoData[]): Record<string, Custodiad
         }
         acc[status].push(item);
         return acc;
-    }, {} as Record<string, CustodiadoData[]>);
+    }, {} as Record<string, PessoaMonitoradaData[]>);
 }
 
 /**
@@ -321,7 +321,7 @@ export function groupByUrgency(dados: ExportData[]): Record<string, ExportData[]
 /**
  * Ordena dados por próximo comparecimento
  */
-export function sortByProximoComparecimento(dados: CustodiadoData[]): CustodiadoData[] {
+export function sortByProximoComparecimento(dados: PessoaMonitoradaData[]): PessoaMonitoradaData[] {
     return [...dados].sort((a, b) => {
         if (!a.proximoComparecimento) return 1;
         if (!b.proximoComparecimento) return -1;
@@ -341,10 +341,10 @@ export function sortByProximoComparecimento(dados: CustodiadoData[]): Custodiado
  * Filtra dados por período
  */
 export function filterByPeriod(
-    dados: CustodiadoData[], 
+    dados: PessoaMonitoradaData[], 
     dataInicio: string, 
     dataFim: string
-): CustodiadoData[] {
+): PessoaMonitoradaData[] {
     const inicio = new Date(dataInicio);
     const fim = new Date(dataFim);
     

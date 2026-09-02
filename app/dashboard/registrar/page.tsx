@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { usePermissions, useAuth } from '@/contexts/AuthContext';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { httpClient } from '@/lib/http/client';
+import { custodiadosService } from '@/lib/api/services';
 import {
   Lock,
   ArrowLeft,
@@ -20,8 +21,12 @@ import {
   Hash,
   MessageSquare,
   Loader2,
-  Check
+  Check,
+  Gavel
 } from 'lucide-react';
+import { CamposPena } from '@/components/RegistroPenaForm';
+import { validarRegistroPena, montarPayloadRegistroPena, FORM_VAZIO as PENA_VAZIA } from '@/lib/execucaoPena';
+import type { RegistroPenaForm as PenaFormState } from '@/types/execucao';
 import { MaskedInputField } from '@/components/MaskedInput';
 import { useToast } from '@/components/Toast';
 import {
@@ -164,6 +169,7 @@ function RegistrarPage() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [tipoEscolhido, setTipoEscolhido] = useState(false);
   const [successState, setSuccessState] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [periodicidadeCustomizada, setPeriodicidadeCustomizada] = useState(false);
@@ -172,6 +178,8 @@ function RegistrarPage() {
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [cepEncontrado, setCepEncontrado] = useState(false);
   const [successData, setSuccessData] = useState<any>(null);
+  const [penaForm, setPenaForm] = useState<PenaFormState>(PENA_VAZIA);
+  const [penaErros, setPenaErros] = useState<ReturnType<typeof validarRegistroPena>['erros']>({});
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -300,6 +308,16 @@ function RegistrarPage() {
       return;
     }
 
+    // execucao exige a pena na MESMA transacao do cadastro
+    if (formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO') {
+      const v = validarRegistroPena(penaForm);
+      setPenaErros(v.erros);
+      if (!v.valido) {
+        showToast({ type: 'error', title: 'Dados da pena incompletos', message: 'Revise a seção "Pena" antes de salvar.', duration: 5000 });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setLoading(true);
 
@@ -326,16 +344,28 @@ function RegistrarPage() {
       if (formData.numero.trim()) body.numero = formData.numero.trim();
       if (formData.complemento.trim()) body.complemento = formData.complemento.trim();
       if (formData.observacoes.trim()) body.observacoes = formData.observacoes.trim();
+      if (formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO') {
+        // processoId e preenchido pelo backend com o processo criado na transacao
+        body.pena = montarPayloadRegistroPena(penaForm, 0);
+      }
 
-      const result = await httpClient.post<any>('/custodiados/cadastro-inicial', body);
+      const result = await httpClient.post<any>('/pessoas-monitoradas/cadastro-inicial', body);
 
       if (result.success) {
         const data = result.data?.data || result.data;
         logAction('create', 'custodiado', { processo: body.processo, nome: body.nome, custodiadoId: data?.custodiadoId, success: true });
         setSuccessData(data);
         setSuccessState(true);
-        showToast({ type: 'success', title: 'Cadastro realizado!', message: 'Custodiado, processo e endereço cadastrados com sucesso.', duration: 3000 });
-        setTimeout(() => router.push('/dashboard/geral'), 2500);
+        const isExec = formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO';
+        showToast({
+          type: 'success',
+          title: 'Cadastro realizado!',
+          message: isExec
+            ? 'Pessoa Monitorada, processo, endereço e pena registrados em uma única transação.'
+            : 'Pessoa Monitorada, processo e endereço cadastradas com sucesso.',
+          duration: 3000,
+        });
+        setTimeout(() => router.push(isExec ? '/dashboard/execucoes' : '/dashboard/geral'), 2500);
       } else {
         const msg = result.message || result.error || 'Erro desconhecido ao cadastrar';
         logAction('create_failed', 'custodiado', { processo: body.processo, error: msg });
@@ -357,8 +387,18 @@ function RegistrarPage() {
     if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
   };
 
+  const [avisoCpfArquivado, setAvisoCpfArquivado] = useState(false);
+
   const handleDocumentChange = (field: 'cpf' | 'rg', value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // aviso informativo, nao bloqueia: ficha arquivada com o mesmo CPF fica invisivel na busca de ativos
+    if (field === 'cpf') {
+      if (isValidCPF(value)) {
+        custodiadosService.cpfArquivado(value).then(setAvisoCpfArquivado);
+      } else if (avisoCpfArquivado) {
+        setAvisoCpfArquivado(false);
+      }
+    }
     if (errors.documentos) {
       const other = field === 'cpf' ? formData.rg : formData.cpf;
       if (value.replace(/\D/g, '').length > 0 || value.trim().length > 0 || other.replace(/\D/g, '').length > 0 || other.trim().length > 0) {
@@ -385,7 +425,7 @@ function RegistrarPage() {
           <h1 className="text-2xl font-bold text-green-800 mb-3">Cadastro Realizado!</h1>
           <p className="text-green-700 mb-6">Todos os dados foram salvos em uma única transação.</p>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-700 space-y-2">
-            <p className="flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Custodiado criado</p>
+            <p className="flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Pessoa Monitorada criada</p>
             <p className="flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Processo vinculado</p>
             <p className="flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Endereço registrado</p>
             <p className="flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Comparecimento inicial gerado</p>
@@ -400,7 +440,55 @@ function RegistrarPage() {
               <p className="text-sm text-yellow-800">Contato ficou como &quot;Pendente&quot;. Atualize quando disponível.</p>
             </div>
           )}
-          <p className="text-xs text-green-500 mt-4">Redirecionando para a lista geral...</p>
+          <p className="text-xs text-green-500 mt-4">
+            {formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO'
+              ? 'Pena registrada. Redirecionando para as execuções...'
+              : 'Redirecionando para a lista geral...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Escolha do tipo de cadastro ───────────────────────────
+
+  const escolherTipo = (natureza: 'CAUTELAR' | 'EXECUCAO_REGIME_ABERTO') => {
+    setFormData(prev => ({ ...prev, naturezaVinculo: natureza }));
+    setTipoEscolhido(true);
+  };
+
+  if (!tipoEscolhido) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 md:p-6">
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">O que você vai cadastrar?</h1>
+          <p className="text-gray-500 text-sm mt-1">A escolha define os passos do cadastro.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => escolherTipo('CAUTELAR')}
+            className="text-left bg-white p-6 rounded-xl border-2 border-gray-200 hover:border-primary hover:shadow-md transition-all"
+          >
+            <UserPlus className="w-8 h-8 text-primary mb-3" />
+            <p className="font-semibold text-gray-800">Pessoa Monitorada — Medida Cautelar</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Comparecimento periódico como medida cautelar (CPP art. 319, IV).
+              Pessoa, processo e endereço em um único cadastro.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => escolherTipo('EXECUCAO_REGIME_ABERTO')}
+            className="text-left bg-white p-6 rounded-xl border-2 border-gray-200 hover:border-purple-500 hover:shadow-md transition-all"
+          >
+            <Gavel className="w-8 h-8 text-purple-700 mb-3" />
+            <p className="font-semibold text-gray-800">Execução de Pena — Regime Aberto</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Cumprimento de pena (LEP arts. 113-119). Após o cadastro, o registro
+              da pena abre em seguida.
+            </p>
+          </button>
         </div>
       </div>
     );
@@ -408,17 +496,32 @@ function RegistrarPage() {
 
   // ─── Render ────────────────────────────────────────────────
 
+  const isExecucao = formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO';
+
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 pb-8">
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
-            <UserPlus className="w-6 h-6 text-white" />
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isExecucao ? 'bg-purple-700' : 'bg-primary'}`}>
+            {isExecucao ? <Gavel className="w-6 h-6 text-white" /> : <UserPlus className="w-6 h-6 text-white" />}
           </div>
           <div className="flex-1">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Cadastrar Custodiado</h1>
-            <p className="text-gray-500 text-sm mt-1">Preencha os campos obrigatórios marcados com *</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+              {isExecucao ? 'Cadastrar Execução de Pena' : 'Cadastrar Pessoa Monitorada'}
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {isExecucao ? 'Regime aberto — a pena é registrada logo após este cadastro. ' : ''}
+              Preencha os campos obrigatórios marcados com *
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setTipoEscolhido(false)}
+            disabled={isSubmitting}
+            className="text-sm text-gray-500 hover:text-gray-700 underline flex-shrink-0"
+          >
+            Trocar tipo
+          </button>
         </div>
         <div className="mt-4"><ProgressIndicator filled={filledCount} total={requiredFields.length} /></div>
       </div>
@@ -455,6 +558,16 @@ function RegistrarPage() {
             <MaskedInputField mask="cpf" label="CPF" value={formData.cpf} onChange={(v) => handleDocumentChange('cpf', v)} errorMessage={errors.cpf} helperText={formData.cpf && isValidCPF(formData.cpf) ? '✓ CPF válido' : undefined} disabled={isSubmitting} />
             <MaskedInputField mask="rg" label="RG" value={formData.rg} onChange={(v) => handleDocumentChange('rg', v)} errorMessage={errors.rg} disabled={isSubmitting} />
           </div>
+          {avisoCpfArquivado && (
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+              <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-800">
+                Existe uma ficha <strong>arquivada</strong> com este CPF. O cadastro pode seguir,
+                mas o histórico anterior ficará em ficha separada — confira em Geral (incluindo
+                arquivados) se não é caso de <strong>reativar</strong> a ficha antiga.
+              </p>
+            </div>
+          )}
           <DocumentStatusBanner cpf={formData.cpf} rg={formData.rg} />
         </div>
 
@@ -462,24 +575,10 @@ function RegistrarPage() {
         <div className="bg-white rounded-xl shadow-sm p-6">
           <SectionHeader icon={Calendar} title="Dados Processuais" number={3} />
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Acompanhamento <span className="text-red-500">*</span></label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-pointer transition-colors ${formData.naturezaVinculo === 'CAUTELAR' ? 'border-primary bg-blue-50 ring-1 ring-primary' : 'border-gray-300 hover:bg-gray-50'}`}>
-                  <input type="radio" name="naturezaVinculo" checked={formData.naturezaVinculo === 'CAUTELAR'} onChange={() => handleInputChange('naturezaVinculo', 'CAUTELAR')} disabled={isSubmitting} className="accent-blue-600" />
-                  <span>
-                    <span className="block text-sm font-medium text-gray-800">Medida Cautelar</span>
-                    <span className="block text-xs text-gray-500">CPP art. 319, IV</span>
-                  </span>
-                </label>
-                <label className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-pointer transition-colors ${formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO' ? 'border-purple-500 bg-purple-50 ring-1 ring-purple-500' : 'border-gray-300 hover:bg-gray-50'}`}>
-                  <input type="radio" name="naturezaVinculo" checked={formData.naturezaVinculo === 'EXECUCAO_REGIME_ABERTO'} onChange={() => handleInputChange('naturezaVinculo', 'EXECUCAO_REGIME_ABERTO')} disabled={isSubmitting} className="accent-purple-600" />
-                  <span>
-                    <span className="block text-sm font-medium text-gray-800">Cumprimento de Pena</span>
-                    <span className="block text-xs text-gray-500">Regime aberto — LEP arts. 113-119</span>
-                  </span>
-                </label>
-              </div>
+            {/* tipo escolhido na tela de entrada */}
+            <div className={`px-4 py-2 rounded-lg text-sm font-medium inline-flex items-center gap-2 ${isExecucao ? 'bg-purple-50 text-purple-800' : 'bg-blue-50 text-blue-800'}`}>
+              {isExecucao ? <Gavel className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+              {isExecucao ? 'Execução de pena — regime aberto (LEP arts. 113-119)' : 'Medida cautelar (CPP art. 319, IV)'}
             </div>
             <MaskedInputField mask="processo" label="Número do Processo (CNJ)" required value={formData.processo} onChange={(v) => handleInputChange('processo', v)} errorMessage={errors.processo} helperText="Formato: 0000000-00.0000.0.00.0000" disabled={isSubmitting} showCounter />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -510,9 +609,17 @@ function RegistrarPage() {
           </div>
         </div>
 
-        {/* ═══ 4. PERIODICIDADE ═══ */}
+        {/* ═══ PENA — só execução; salva na mesma transação do cadastro ═══ */}
+        {isExecucao && (
+          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-l-purple-600">
+            <SectionHeader icon={Gavel} title="Pena (Execução)" number={4} />
+            <CamposPena form={penaForm} erros={penaErros} onChange={setPenaForm} disabled={isSubmitting} />
+          </div>
+        )}
+
+        {/* ═══ PERIODICIDADE ═══ */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <SectionHeader icon={Hash} title="Periodicidade" number={4} />
+          <SectionHeader icon={Hash} title="Periodicidade" number={isExecucao ? 5 : 4} />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Frequência de Comparecimento <span className="text-red-500">*</span></label>
             {!periodicidadeCustomizada ? (
@@ -531,7 +638,7 @@ function RegistrarPage() {
 
         {/* ═══ 5. ENDEREÇO ═══ */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <SectionHeader icon={MapPin} title="Endereço" number={5} />
+          <SectionHeader icon={MapPin} title="Endereço" number={isExecucao ? 6 : 5} />
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -583,7 +690,7 @@ function RegistrarPage() {
 
         {/* ═══ 6. OBSERVAÇÕES ═══ */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <SectionHeader icon={MessageSquare} title="Observações" number={6} />
+          <SectionHeader icon={MessageSquare} title="Observações" number={isExecucao ? 7 : 6} />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Observações <span className="text-gray-400 text-xs ml-2">({formData.observacoes.length}/500)</span></label>
             <textarea value={formData.observacoes} onChange={(e) => handleInputChange('observacoes', e.target.value.slice(0, 500))} rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none" placeholder="Informações adicionais (opcional)..." maxLength={500} disabled={isSubmitting} />
@@ -600,7 +707,7 @@ function RegistrarPage() {
               <ArrowLeft className="w-4 h-4" />Voltar
             </button>
             <button type="submit" disabled={loading || isSubmitting || !allFilled} className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto justify-center font-medium">
-              {loading || isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Cadastrando...</> : <><UserPlus className="w-4 h-4" />Cadastrar Custodiado</>}
+              {loading || isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />Cadastrando...</> : <><UserPlus className="w-4 h-4" />Cadastrar Pessoa Monitorada</>}
             </button>
           </div>
         </div>

@@ -96,12 +96,8 @@ class HttpClient {
     this.onUnauthorized = handler;
   }
 
-  /**
-   * O token agora vive num cookie httpOnly — ilegível para o JavaScript, e é esse o ponto:
-   * um XSS não consegue mais exfiltrá-lo. Como não dá para checá-lo daqui, o sinal de
-   * "há sessão" passa a ser o perfil do usuário, que não é credencial. Se alguém forjar
-   * esse valor no localStorage, não ganha nada: quem decide é o backend, que responde 401.
-   */
+  // Token vive em cookie httpOnly (ilegivel aqui); user-data e so sinal de UI,
+  // quem decide e o backend com 401.
   private isAuthenticated(): boolean {
     if (typeof window === 'undefined') return false;
     return !!localStorage.getItem('user-data');
@@ -133,8 +129,7 @@ class HttpClient {
     logger.log('[HttpClient] Limpando dados de autenticação');
     this.clearAuthToken();
     if (typeof window !== 'undefined') {
-      // Os cookies httpOnly são apagados pelo backend no /auth/logout — JS não os alcança.
-      // As remoções abaixo limpam resíduo de quem logou antes da migração para cookie.
+      // residuo de sessoes pre-cookie; os cookies httpOnly quem apaga e o backend
       localStorage.removeItem('access-token');
       localStorage.removeItem('refresh-token');
       localStorage.removeItem('api_auth_token');
@@ -154,7 +149,6 @@ class HttpClient {
       return new Promise((resolve, reject) => {
         this.failedQueue.push({ resolve, reject });
       }).then(() => {
-        // Nada a reinjetar: o cookie renovado já acompanha a nova requisição.
         return this.makeRequest(endpoint, originalConfig);
       }).catch(err => Promise.reject(err));
     }
@@ -163,7 +157,7 @@ class HttpClient {
 
     try {
       logger.log('[HttpClient] Tentando renovar token...');
-      // Sem corpo: o refresh token é um cookie httpOnly restrito a /api/auth.
+      // refresh token vem no cookie httpOnly, sem corpo
       const response = await fetch(`${this.baseURL}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,8 +228,6 @@ class HttpClient {
       return { success: false, status: 401, error: 'Usuário não autenticado', timestamp: new Date().toISOString() };
     }
 
-    // Sem header Authorization: o cookie httpOnly viaja sozinho (mesma origem via rewrite).
-
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
     const requestHeaders: Record<string, string> = { ...this.defaultHeaders, ...headers };
 
@@ -271,10 +263,7 @@ class HttpClient {
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
-      // BUG CORRIGIDO: o AbortController era criado UMA vez, fora do laço. Quando o timeout
-      // disparava, o sinal ficava abortado para sempre — as tentativas seguintes falhavam
-      // instantaneamente com "signal is aborted without reason", mascarando o erro original
-      // (foi exatamente o que apareceu no login em produção). Um controller por tentativa.
+      // um AbortController POR tentativa: sinal abortado nao reseta
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 

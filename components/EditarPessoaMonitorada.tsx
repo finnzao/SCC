@@ -58,7 +58,7 @@ function rgTemConteudo(rg: string | null | undefined): boolean {
   return digits.length > 0;
 }
 
-export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave }: Props) {
+export default function EditarPessoaMonitoradaModal({ dados, onClose, onVoltar, onSave }: Props) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -95,7 +95,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         let custodiado: any = null;
         if (isUUID(rawId)) {
           setCustodiadoUuid(String(rawId));
-          const resp = await httpClient.get<any>(`/custodiados/${rawId}`);
+          const resp = await httpClient.get<any>(`/pessoas-monitoradas/${rawId}`);
           if (resp.success) {
             custodiado = resp.data?.data || resp.data;
             if (custodiado?.numericId) setCustodiadoNumericId(custodiado.numericId);
@@ -134,7 +134,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
           setDadosOriginais(form);
         }
       } catch (error) {
-        console.error('[EditarCustodiado] Erro ao buscar dados:', error);
+        console.error('[EditarPessoaMonitorada] Erro ao buscar dados:', error);
         setDadosOriginais(form);
       } finally {
         setLoadingData(false);
@@ -300,7 +300,7 @@ export default function EditarCustodiadoModal({ dados, onClose, onVoltar, onSave
         throw new Error(resultado.message || 'Erro ao atualizar dados');
       }
     } catch (error: any) {
-      console.error('[EditarCustodiado] Erro:', error);
+      console.error('[EditarPessoaMonitorada] Erro:', error);
       showToast({ type: 'error', title: 'Erro ao atualizar', message: error.message || 'Tente novamente.', duration: 5000 });
     } finally {
       setLoading(false);

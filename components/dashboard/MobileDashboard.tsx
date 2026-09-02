@@ -124,7 +124,7 @@ export function MobileDashboard({ stats, analiseAtrasos, totalAtrasados, onRefre
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center"><AlertTriangle className="w-6 h-6" /></div>
                 <div>
-                  <p className="font-bold text-base">{totalAtrasados} em Atraso</p>
+                  <p className="font-bold text-base">{totalAtrasados} Inadimplente(s)</p>
                   <p className="text-xs text-white/80">
                     {analiseAtrasos ? `Média de ${Math.round(analiseAtrasos.mediaDiasAtraso)} dias` : 'Toque para ver detalhes'}
                   </p>

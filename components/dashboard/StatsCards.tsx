@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, CheckCircle, AlertTriangle, Calendar, ArrowRight } from 'lucide-react';
+import { Users, CheckCircle, AlertTriangle, Calendar, ArrowRight, Gavel, Scale, UserX } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import type { DashboardStats } from './types';
 import { createFilterLink } from './types';
@@ -16,9 +16,11 @@ export function StatsCards({ stats, mediaDiasAtraso }: StatsCardsProps) {
         <Card className="p-6 border-l-4 border-l-primary hover:shadow-lg transition-all cursor-pointer group">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-text-muted text-sm font-medium">Total de Custodiados</p>
+              <p className="text-text-muted text-sm font-medium">Total de Pessoas Monitoradas</p>
               <p className="text-3xl font-bold text-primary-dark">{stats.total}</p>
-              <p className="text-sm text-text-muted mt-1">{stats.totalComparecimentos} comparecimentos</p>
+              <p className="text-sm text-text-muted mt-1">
+                {stats.cautelares} cautelar · {stats.execucoes} execução
+              </p>
             </div>
             <div className="flex items-center">
               <Users className="w-12 h-12 text-primary opacity-80" />
@@ -44,13 +46,17 @@ export function StatsCards({ stats, mediaDiasAtraso }: StatsCardsProps) {
         </Card>
       </Link>
 
+      {/* conceito unico: inadimplente = passou da data (o antigo card "Atrasados" era duplicado) */}
       <Link href={createFilterLink({ status: 'inadimplente' })}>
         <Card className="p-6 border-l-4 border-l-danger hover:shadow-lg transition-all cursor-pointer group">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-text-muted text-sm font-medium">Inadimplentes</p>
               <p className="text-3xl font-bold text-danger">{stats.inadimplentes}</p>
-              <p className="text-sm text-danger font-medium">{stats.percentualInadimplencia.toFixed(1)}% do total</p>
+              <p className="text-sm text-danger font-medium">
+                {stats.percentualInadimplencia.toFixed(1)}% do total
+                {mediaDiasAtraso !== null && mediaDiasAtraso > 0 ? ` · média ${mediaDiasAtraso} dias` : ''}
+              </p>
             </div>
             <div className="flex items-center">
               <AlertTriangle className="w-12 h-12 text-danger opacity-80" />
@@ -76,23 +82,55 @@ export function StatsCards({ stats, mediaDiasAtraso }: StatsCardsProps) {
         </Card>
       </Link>
 
-      <Link href={createFilterLink({ urgencia: 'atrasados' })}>
-        <Card className="p-6 border-l-4 border-l-red-500 hover:shadow-lg transition-all cursor-pointer group">
+      {stats.foragidos > 0 && (
+        <Card className="p-6 border-l-4 border-l-gray-800 bg-gray-50">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-text-muted text-sm font-medium">Atrasados</p>
-              <p className="text-3xl font-bold text-red-500">{stats.atrasados}</p>
-              <p className="text-sm text-text-muted">
-                {mediaDiasAtraso !== null ? `Média: ${mediaDiasAtraso} dias` : 'Sem atrasos'}
-              </p>
+              <p className="text-text-muted text-sm font-medium">Foragidos</p>
+              <p className="text-3xl font-bold text-gray-800">{stats.foragidos}</p>
+              <p className="text-sm text-text-muted">fora dos contadores de atraso</p>
             </div>
-            <div className="flex items-center">
-              <AlertTriangle className="w-12 h-12 text-red-500 opacity-80" />
-              <ArrowRight className="w-4 h-4 text-red-500 ml-2 group-hover:translate-x-1 transition-transform" />
-            </div>
+            <UserX className="w-12 h-12 text-gray-700 opacity-80" />
           </div>
         </Card>
-      </Link>
+      )}
+
+      {/* Cards de execução penal — só quando a vara tem execuções cadastradas */}
+      {stats.execucoes > 0 && (
+        <>
+          <Link href="/dashboard/execucoes">
+            <Card className="p-6 border-l-4 border-l-red-600 hover:shadow-lg transition-all cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Próximas Extinções</p>
+                  <p className="text-3xl font-bold text-red-600">{stats.proximasExtincao}</p>
+                  <p className="text-sm text-text-muted">término em até 60 dias</p>
+                </div>
+                <div className="flex items-center">
+                  <Gavel className="w-12 h-12 text-red-600 opacity-80" />
+                  <ArrowRight className="w-4 h-4 text-red-600 ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Card>
+          </Link>
+
+          <Link href="/dashboard/execucoes">
+            <Card className="p-6 border-l-4 border-l-amber-500 hover:shadow-lg transition-all cursor-pointer group">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-muted text-sm font-medium">Aguardando Justificação</p>
+                  <p className="text-3xl font-bold text-amber-600">{stats.aguardandoJustificacao}</p>
+                  <p className="text-sm text-text-muted">pendente de decisão</p>
+                </div>
+                <div className="flex items-center">
+                  <Scale className="w-12 h-12 text-amber-500 opacity-80" />
+                  <ArrowRight className="w-4 h-4 text-amber-500 ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Card>
+          </Link>
+        </>
+      )}
     </div>
   );
 }
