@@ -46,6 +46,7 @@ export interface ComparecimentosPaginadosParams {
   tipoValidacao?: string;
   custodiadoNome?: string;
   numeroProcesso?: string;
+  natureza?: string;
 }
 
 // ── Parâmetros de exportação ────────────────────────────────

@@ -20,6 +20,7 @@ import { formatToBrazilianDate } from '@/lib/utils/dateutils';
 import { FormattingCPF as formatCPF, FormattingPhone as formatPhone } from '@/lib/utils/formatting';
 import EditarPessoaMonitoradaModal from '@/components/EditarPessoaMonitorada';
 import EditarProcessoModal from '@/components/EditarProcessoModal';
+import MedidasCautelares from '@/components/MedidasCautelares';
 import ProcessoForm from '@/components/ProcessoForm';
 import ProcessoActions from '@/components/ProcessoActions';
 import { usePermissions } from '@/contexts/AuthContext';
@@ -129,6 +130,7 @@ function ProcessoDetailPanel({ processo, onClose }: { processo: Processo; onClos
           <p className="text-xs text-gray-700">{processo.observacoes}</p>
         </div>
       )}
+      <MedidasCautelares processoId={processo.id} />
       <p className="text-xs text-gray-400">
         Criado em {fmtBR(processo.criadoEm?.split('T')[0])}
         {processo.atualizadoEm && ` · Atualizado em ${fmtBR(processo.atualizadoEm.split('T')[0])}`}

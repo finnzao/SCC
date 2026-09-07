@@ -20,6 +20,7 @@ interface UseComparecimentosPaginadosOptions {
     tipoValidacao?: string;
     custodiadoNome?: string;
     numeroProcesso?: string;
+    natureza?: string;
   };
 }
 
@@ -101,6 +102,7 @@ export function useComparecimentosPaginados(
     dataInicio: filtrosIniciais.dataInicio,
     dataFim: filtrosIniciais.dataFim,
     tipoValidacao: filtrosIniciais.tipoValidacao,
+    natureza: filtrosIniciais.natureza,
     custodiadoNome: filtrosIniciais.custodiadoNome,
     numeroProcesso: filtrosIniciais.numeroProcesso,
   });
@@ -136,6 +138,7 @@ export function useComparecimentosPaginados(
       if (parametros.dataInicio) queryParams.dataInicio = parametros.dataInicio;
       if (parametros.dataFim) queryParams.dataFim = parametros.dataFim;
       if (parametros.tipoValidacao) queryParams.tipoValidacao = parametros.tipoValidacao;
+      if (parametros.natureza) queryParams.natureza = parametros.natureza;
       if (parametros.custodiadoNome) queryParams.custodiadoNome = parametros.custodiadoNome;
       if (parametros.numeroProcesso) queryParams.numeroProcesso = parametros.numeroProcesso;
 

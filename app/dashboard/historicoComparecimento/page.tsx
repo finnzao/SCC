@@ -62,6 +62,7 @@ function HistoricoPage() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [filtroTipoValidacao, setFiltroTipoValidacao] = useState('todos');
+  const [filtroNatureza, setFiltroNatureza] = useState('todos');
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -100,6 +101,7 @@ function HistoricoPage() {
     filtrosIniciais: {
       custodiadoNome: searchParams.get('busca') || undefined,
       tipoValidacao: searchParams.get('tipo') || undefined,
+      natureza: searchParams.get('natureza') || undefined,
       dataInicio: searchParams.get('dataInicio') || undefined,
       dataFim: searchParams.get('dataFim') || undefined,
     },
@@ -114,6 +116,8 @@ function HistoricoPage() {
     const df = searchParams.get('dataFim');
     if (b) setFiltroTexto(b);
     if (t) setFiltroTipoValidacao(t);
+    const nat = searchParams.get('natureza');
+    if (nat) setFiltroNatureza(nat);
     if (di) setDataInicio(di);
     if (df) setDataFim(df);
   }, [searchParams]);
@@ -124,10 +128,11 @@ function HistoricoPage() {
     aplicarFiltros({
       custodiadoNome: filtroTextoDebounced || undefined,
       tipoValidacao: filtroTipoValidacao !== 'todos' ? filtroTipoValidacao.toUpperCase() : undefined,
+      natureza: filtroNatureza !== 'todos' ? filtroNatureza : undefined,
       dataInicio: dataInicio || undefined,
       dataFim: dataFim || undefined,
     });
-  }, [filtroTextoDebounced, filtroTipoValidacao, dataInicio, dataFim, aplicarFiltros]);
+  }, [filtroTextoDebounced, filtroTipoValidacao, filtroNatureza, dataInicio, dataFim, aplicarFiltros]);
 
   // ── Atualizar URL ─────────────────────────────────────────
 
@@ -135,11 +140,12 @@ function HistoricoPage() {
     const p = new URLSearchParams();
     if (filtroTexto) p.set('busca', filtroTexto);
     if (filtroTipoValidacao !== 'todos') p.set('tipo', filtroTipoValidacao);
+    if (filtroNatureza !== 'todos') p.set('natureza', filtroNatureza);
     if (dataInicio) p.set('dataInicio', dataInicio);
     if (dataFim) p.set('dataFim', dataFim);
     const qs = p.toString();
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-  }, [filtroTexto, filtroTipoValidacao, dataInicio, dataFim]);
+  }, [filtroTexto, filtroTipoValidacao, filtroNatureza, dataInicio, dataFim]);
 
   // ── Responsive ────────────────────────────────────────────
 
@@ -157,6 +163,7 @@ function HistoricoPage() {
   const handleLimpar = useCallback(() => {
     setFiltroTexto('');
     setFiltroTipoValidacao('todos');
+    setFiltroNatureza('todos');
     setDataInicio('');
     setDataFim('');
     limparFiltrosHook();
@@ -187,7 +194,7 @@ function HistoricoPage() {
 
   // ── Variáveis derivadas ───────────────────────────────────
 
-  const hasFilters = filtroTexto || filtroTipoValidacao !== 'todos' || dataInicio || dataFim;
+  const hasFilters = filtroTexto || filtroTipoValidacao !== 'todos' || filtroNatureza !== 'todos' || dataInicio || dataFim;
   const { paginaAtual, totalPaginas, totalItens } = paginacao;
   const startIdx = paginaAtual * paginacao.itensPorPagina;
   const endIdx = startIdx + comparecimentos.length;
@@ -235,7 +242,7 @@ function HistoricoPage() {
   // ── Componente de filtros ─────────────────────────────────
 
   const renderFilters = () => (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Validação</label>
         <select className="w-full px-3 py-2 border border-border rounded-lg" value={filtroTipoValidacao} onChange={e => setFiltroTipoValidacao(e.target.value)}>
@@ -243,6 +250,15 @@ function HistoricoPage() {
           <option value="presencial">Presencial</option>
           <option value="online">Online</option>
           <option value="cadastro_inicial">Cadastro Inicial</option>
+          <option value="falta_justificada">Falta Justificada</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Natureza do Vínculo</label>
+        <select className="w-full px-3 py-2 border border-border rounded-lg" value={filtroNatureza} onChange={e => setFiltroNatureza(e.target.value)}>
+          <option value="todos">Todas</option>
+          <option value="CAUTELAR">Cautelar</option>
+          <option value="EXECUCAO">Execução de pena</option>
         </select>
       </div>
       <div>
