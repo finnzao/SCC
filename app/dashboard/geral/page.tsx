@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,7 +7,7 @@ import { usePessoasMonitoradasPaginados } from '@/hooks/usePessoasMonitoradasPag
 import { exportarComFallback } from '@/services/exportacaoService';
 import { useToast } from '@/components/Toast';
 import { formatToBrazilianDate } from '@/lib/utils/dateutils';
-import type { PessoaMonitoradaData } from '@/types/api';
+import type { PessoaMonitoradaListItem } from '@/types/api';
 import {
   Search,
   AlertTriangle,
@@ -167,8 +166,8 @@ function GeralPage() {
   }, []);
 
   const handleVerDetalhes = useCallback(
-    (item: PessoaMonitoradaData) => {
-      const id = (item as any).id || (item as any).publicId;
+    (item: PessoaMonitoradaListItem) => {
+      const id = item.id;
       router.push(`/dashboard/pessoas/${id}`);
     },
     [router]
@@ -340,7 +339,7 @@ function GeralPage() {
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value as any)}
+                  onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'EM_CONFORMIDADE' | 'INADIMPLENTE')}
                 >
                   <option value="todos">Todos os Status</option>
                   <option value="EM_CONFORMIDADE">Em Conformidade</option>
@@ -366,17 +365,17 @@ function GeralPage() {
 
           <div className="space-y-3">
             {custodiados.map((item, index) => {
-              const proximo = (item as any).proximoComparecimento || '';
+              const proximo = item.proximoComparecimento || '';
               const hoje = isToday(proximo);
               const atrasado = isOverdue(proximo);
               const dias = getDaysUntil(proximo);
-              const urgente = (item as any).urgente || false;
+              const urgente = item.urgente || false;
               const statusNorm =
                 item.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente';
 
               return (
                 <div
-                  key={(item as any).id || index}
+                  key={item.id || index}
                   className={`bg-white rounded-lg shadow-sm p-4 ${
                     urgente
                       ? 'border-l-4 border-red-500'
@@ -393,7 +392,7 @@ function GeralPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold text-gray-800 truncate">{item.nome}</h3>
-                          <MistoBadge natureza={(item as any).natureza} />
+                          <MistoBadge natureza={item.natureza} />
                         </div>
                         <p className="text-xs text-gray-600">{item.cpf}</p>
                       </div>
@@ -554,7 +553,7 @@ function GeralPage() {
                 <select
                   className="w-full px-3 py-2 border border-border rounded-lg"
                   value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value as any)}
+                  onChange={(e) => setFiltroStatus(e.target.value as 'todos' | 'EM_CONFORMIDADE' | 'INADIMPLENTE')}
                 >
                   <option value="todos">Todos</option>
                   <option value="EM_CONFORMIDADE">Em Conformidade</option>
@@ -638,17 +637,17 @@ function GeralPage() {
                 </thead>
                 <tbody>
                   {custodiados.map((item, index) => {
-                    const proximo = (item as any).proximoComparecimento || '';
-                    const hoje = (item as any).comparecimentoHoje || isToday(proximo);
-                    const atrasado = (item as any).atrasado || isOverdue(proximo);
-                    const dias = (item as any).diasAtraso || getDaysUntil(proximo);
-                    const urgente = (item as any).urgente || false;
+                    const proximo = item.proximoComparecimento || '';
+                    const hoje = item.comparecimentoHoje || isToday(proximo);
+                    const atrasado = item.atrasado || isOverdue(proximo);
+                    const dias = item.diasAtraso ?? getDaysUntil(proximo);
+                    const urgente = item.urgente || false;
                     const statusNorm =
                       item.status === 'EM_CONFORMIDADE' ? 'em conformidade' : 'inadimplente';
 
                     return (
                       <tr
-                        key={(item as any).id || index}
+                        key={item.id || index}
                         className={`border-b border-border hover:bg-gray-50 cursor-pointer ${
                           urgente
                             ? 'bg-red-50'
@@ -663,7 +662,7 @@ function GeralPage() {
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-text-base">{item.nome}</p>
-                            <MistoBadge natureza={(item as any).natureza} />
+                            <MistoBadge natureza={item.natureza} />
                           </div>
                           <p className="text-sm text-text-muted">{item.cpf}</p>
                         </td>
@@ -683,8 +682,8 @@ function GeralPage() {
                           </span>
                         </td>
                         <td className="p-3 text-center text-sm">
-                          {(item as any).ultimoComparecimento
-                            ? formatToBrazilianDate((item as any).ultimoComparecimento)
+                          {item.ultimoComparecimento
+                            ? formatToBrazilianDate(item.ultimoComparecimento)
                             : '-'}
                         </td>
                         <td className="p-3 text-center">

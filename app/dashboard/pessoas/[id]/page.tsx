@@ -242,7 +242,8 @@ function PessoaMonitoradaDetalhesPage() {
 
   const handleVerExecucao = async (processoId: number) => {
     const r = await execucaoService.buscarPorProcesso(processoId);
-    const exec = (r as any)?.data?.data || (r as any)?.data;
+    const bruto: unknown = r.data?.data ?? r.data;
+    const exec = bruto as { id?: number } | undefined;
     if (r.success && exec?.id) router.push(`/dashboard/execucoes/${exec.id}`);
     else showError('Execução não encontrada', 'A pena deste processo ainda não foi registrada.');
   };

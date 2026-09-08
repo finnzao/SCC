@@ -1,12 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { httpClient } from '@/lib/http/client';
-import type { PessoaMonitoradaData } from '@/types/api';
+// Wrapper fino sobre usePaginacao: so a configuracao da listagem de pessoas
+// (endpoint, defaults, ordenacao e os gatilhos de refetch entre telas).
+
+import { useCallback, useEffect } from 'react';
+import { usePaginacao } from '@/hooks/usePaginacao';
+import type { PessoaMonitoradaListItem } from '@/types/api';
 import type { PessoasMonitoradasPaginadosParams, PaginacaoMeta } from '@/types/pagination';
 
-interface UsePessoasMonitoradasPaginadosOptions {
+interface Options {
   size?: number;
   autoLoad?: boolean;
   filtrosIniciais?: {
@@ -19,8 +21,8 @@ interface UsePessoasMonitoradasPaginadosOptions {
   };
 }
 
-interface UsePessoasMonitoradasPaginadosReturn {
-  custodiados: PessoaMonitoradaData[];
+interface Retorno {
+  custodiados: PessoaMonitoradaListItem[];
   paginacao: PaginacaoMeta;
   loading: boolean;
   error: string | null;
@@ -34,211 +36,81 @@ interface UsePessoasMonitoradasPaginadosReturn {
   refetch: () => void;
 }
 
-const PAGINACAO_INICIAL: PaginacaoMeta = {
-  paginaAtual: 0,
-  totalPaginas: 0,
-  totalItens: 0,
-  itensPorPagina: 20,
-  temProxima: false,
-  temAnterior: false,
-};
-
-export function usePessoasMonitoradasPaginados(
-  options: UsePessoasMonitoradasPaginadosOptions = {}
-): UsePessoasMonitoradasPaginadosReturn {
+export function usePessoasMonitoradasPaginados(options: Options = {}): Retorno {
   const { size = 20, autoLoad = true, filtrosIniciais = {} } = options;
 
-  const [custodiados, setCustodiados] = useState<PessoaMonitoradaData[]>([]);
-  const [paginacao, setPaginacao] = useState<PaginacaoMeta>({
-    ...PAGINACAO_INICIAL,
-    itensPorPagina: size,
+  const nucleo = usePaginacao<PessoasMonitoradasPaginadosParams, PessoaMonitoradaListItem>({
+    endpoint: '/pessoas-monitoradas',
+    autoLoad,
+    mensagemErro: 'Erro ao carregar custodiados',
+    paramsIniciais: {
+      page: 0,
+      size,
+      nome: filtrosIniciais.nome,
+      cpf: filtrosIniciais.cpf,
+      status: filtrosIniciais.status,
+      natureza: filtrosIniciais.natureza,
+      ordenarPor: filtrosIniciais.ordenarPor || 'nome',
+      direcao: filtrosIniciais.direcao || 'asc',
+    },
+    extrairLista: dados =>
+      Array.isArray(dados) ? dados : Array.isArray(dados.data) ? dados.data : [],
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const [params, setParams] = useState<PessoasMonitoradasPaginadosParams>({
-    page: 0,
-    size,
-    nome: filtrosIniciais.nome,
-    cpf: filtrosIniciais.cpf,
-    status: filtrosIniciais.status,
-    natureza: filtrosIniciais.natureza,
-    ordenarPor: filtrosIniciais.ordenarPor || 'nome',
-    direcao: filtrosIniciais.direcao || 'asc',
-  });
+  const { refetch } = nucleo;
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const paramsRef = useRef(params);
-  paramsRef.current = params;
-
-  const buscar = useCallback(async (parametros: PessoasMonitoradasPaginadosParams) => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const queryParams: Record<string, string | number> = {
-        page: parametros.page,
-        size: parametros.size,
-      };
-      if (parametros.nome) queryParams.nome = parametros.nome;
-      if (parametros.cpf) queryParams.cpf = parametros.cpf;
-      if (parametros.status) queryParams.status = parametros.status;
-      if (parametros.natureza) queryParams.natureza = parametros.natureza;
-      if (parametros.ordenarPor) queryParams.ordenarPor = parametros.ordenarPor;
-      if (parametros.direcao) queryParams.direcao = parametros.direcao;
-
-      const response = await httpClient.get<any>('/pessoas-monitoradas', queryParams);
-
-      if (abortControllerRef.current?.signal.aborted) return;
-
-      if (response.success && response.data) {
-        const dados = response.data;
-
-        let lista: PessoaMonitoradaData[] = [];
-        if (Array.isArray(dados)) {
-          lista = dados;
-        } else if (Array.isArray(dados.data)) {
-          lista = dados.data;
-        }
-
-        setCustodiados(lista);
-
-        if (dados.totalPaginas !== undefined) {
-          setPaginacao({
-            paginaAtual: dados.paginaAtual ?? parametros.page,
-            totalPaginas: dados.totalPaginas ?? 1,
-            totalItens: dados.totalItens ?? 0,
-            itensPorPagina: dados.itensPorPagina ?? parametros.size,
-            temProxima: dados.temProxima ?? false,
-            temAnterior: dados.temAnterior ?? false,
-          });
-        } else {
-          setPaginacao({
-            paginaAtual: 0,
-            totalPaginas: 1,
-            totalItens: lista.length,
-            itensPorPagina: lista.length,
-            temProxima: false,
-            temAnterior: false,
-          });
-        }
-      } else {
-        setError(response.message || 'Erro ao carregar custodiados');
-        setCustodiados([]);
-        setPaginacao(PAGINACAO_INICIAL);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      console.error('[usePessoasMonitoradasPaginados] Erro:', err);
-      setError('Erro ao conectar com o servidor');
-      setCustodiados([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // outras telas avisam que a lista envelheceu (registro/edicao em outra rota)
   useEffect(() => {
-    if (autoLoad) buscar(params);
-    return () => { abortControllerRef.current?.abort(); };
-  }, [params, buscar, autoLoad]);
-
-  useEffect(() => {
-    const handler = () => {
-      buscar(paramsRef.current);
-    };
-
+    const handler = () => refetch();
     window.addEventListener('comparecimento-registrado', handler);
     window.addEventListener('custodiado-atualizado', handler);
-
     return () => {
       window.removeEventListener('comparecimento-registrado', handler);
       window.removeEventListener('custodiado-atualizado', handler);
     };
-  }, [buscar]);
+  }, [refetch]);
 
   useEffect(() => {
-    const needsRefetch = typeof window !== 'undefined'
-      ? sessionStorage.getItem('needsRefetch')
-      : null;
-
-    if (needsRefetch === 'true') {
-      sessionStorage.removeItem('needsRefetch');
-      sessionStorage.removeItem('lastUpdate');
-      buscar(paramsRef.current);
-    }
-  }, [buscar]);
-
-  useEffect(() => {
-    const handleFocus = () => {
-      const needsRefetch = sessionStorage.getItem('needsRefetch');
-      if (needsRefetch === 'true') {
+    const consumirNeedsRefetch = () => {
+      if (sessionStorage.getItem('needsRefetch') === 'true') {
         sessionStorage.removeItem('needsRefetch');
         sessionStorage.removeItem('lastUpdate');
-        buscar(paramsRef.current);
+        refetch();
       }
     };
+    consumirNeedsRefetch();
+    window.addEventListener('focus', consumirNeedsRefetch);
+    return () => window.removeEventListener('focus', consumirNeedsRefetch);
+  }, [refetch]);
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [buscar]);
-
-  const irParaPagina = useCallback((page: number) => {
-    setParams(prev => ({ ...prev, page }));
-  }, []);
-
-  const proximaPagina = useCallback(() => {
-    if (paginacao.temProxima) {
-      setParams(prev => ({ ...prev, page: prev.page + 1 }));
-    }
-  }, [paginacao.temProxima]);
-
-  const paginaAnterior = useCallback(() => {
-    if (paginacao.temAnterior) {
-      setParams(prev => ({ ...prev, page: Math.max(0, prev.page - 1) }));
-    }
-  }, [paginacao.temAnterior]);
-
-  const aplicarFiltros = useCallback((filtros: Partial<PessoasMonitoradasPaginadosParams>) => {
-    setParams(prev => ({ ...prev, ...filtros, page: 0 }));
-  }, []);
-
-  const limparFiltros = useCallback(() => {
-    setParams({ page: 0, size, ordenarPor: 'nome', direcao: 'asc' });
-  }, [size]);
-
-  const ordenarPorFn = useCallback((
+  const ordenarPor = useCallback((
     campo: PessoasMonitoradasPaginadosParams['ordenarPor'],
     direcao?: 'asc' | 'desc'
   ) => {
-    setParams(prev => ({
+    nucleo.atualizarParams(prev => ({
       ...prev,
       ordenarPor: campo,
       direcao: direcao || (prev.ordenarPor === campo && prev.direcao === 'asc' ? 'desc' : 'asc'),
       page: 0,
     }));
-  }, []);
+  }, [nucleo]);
 
-  const refetch = useCallback(() => {
-    buscar(paramsRef.current);
-  }, [buscar]);
+  const limparFiltros = useCallback(() => {
+    nucleo.limparFiltros({ page: 0, size, ordenarPor: 'nome', direcao: 'asc' });
+  }, [nucleo, size]);
 
   return {
-    custodiados,
-    paginacao,
-    loading,
-    error,
-    filtrosAtivos: params,
-    irParaPagina,
-    proximaPagina,
-    paginaAnterior,
-    aplicarFiltros,
+    custodiados: nucleo.itens,
+    paginacao: nucleo.paginacao,
+    loading: nucleo.loading,
+    error: nucleo.error,
+    filtrosAtivos: nucleo.filtrosAtivos,
+    irParaPagina: nucleo.irParaPagina,
+    proximaPagina: nucleo.proximaPagina,
+    paginaAnterior: nucleo.paginaAnterior,
+    aplicarFiltros: nucleo.aplicarFiltros,
     limparFiltros,
-    ordenarPor: ordenarPorFn,
+    ordenarPor,
     refetch,
   };
 }

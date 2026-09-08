@@ -131,6 +131,30 @@ export interface PessoaMonitoradaData extends PessoaMonitoradaDTO {
   cidadeEstado?: string;
 }
 
+/** Linha da listagem paginada — espelha o PessoaMonitoradaListDTO do backend. */
+export interface PessoaMonitoradaListItem {
+  id: string;                       // publicId (UUID)
+  numericId: number;
+  nome: string;
+  cpf?: string | null;
+  rg?: string | null;
+  documentoExibicao?: string;
+  processo?: string | null;
+  vara?: string | null;
+  comarca?: string | null;
+  status?: StatusComparecimento;
+  situacao?: 'ATIVO' | 'ARQUIVADO' | 'FORAGIDO';
+  ultimoComparecimento?: string | null;
+  proximoComparecimento?: string | null;
+  diasAtraso?: number;
+  periodicidade?: number | null;
+  inadimplente?: boolean;
+  comparecimentoHoje?: boolean;
+  urgente?: boolean;
+  atrasado?: boolean;
+  natureza?: 'CAUTELAR' | 'EXECUCAO' | 'MISTO';
+}
+
 // PessoaMonitoradaListDTO para listagens simplificadas
 export interface PessoaMonitoradaListDTO {
   id: number;

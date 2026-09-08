@@ -1,19 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { httpClient } from '@/lib/http/client';
+'use client';
+
+// Wrapper fino sobre usePaginacao: configuracao da listagem de comparecimentos
+// (endpoint /todos, formatacao de exibicao por item).
+
+import { usePaginacao } from '@/hooks/usePaginacao';
 import type {
   ComparecimentosPaginadosParams,
   ComparecimentoComProcesso,
   PaginacaoMeta,
 } from '@/types/pagination';
 
-// ── Tipos do hook ───────────────────────────────────────────
-
-interface UseComparecimentosPaginadosOptions {
-  /** Quantidade de registros por página (default: 50) */
+interface Options {
   size?: number;
-  /** Carregar automaticamente ao montar */
   autoLoad?: boolean;
-  /** Filtros iniciais */
   filtrosIniciais?: {
     dataInicio?: string;
     dataFim?: string;
@@ -24,267 +23,81 @@ interface UseComparecimentosPaginadosOptions {
   };
 }
 
-interface UseComparecimentosPaginadosReturn {
-  /** Lista de comparecimentos da página atual (já com numeroProcesso) */
+interface Retorno {
   comparecimentos: ComparecimentoComProcesso[];
-  /** Metadados de paginação */
   paginacao: PaginacaoMeta;
-  /** Indica se está carregando */
   loading: boolean;
-  /** Mensagem de erro, se houver */
   error: string | null;
-  /** Filtros atualmente aplicados */
   filtrosAtivos: Partial<ComparecimentosPaginadosParams>;
-
-  // ── Ações ──
-
-  /** Navegar para uma página */
   irParaPagina: (page: number) => void;
-  /** Próxima página */
   proximaPagina: () => void;
-  /** Página anterior */
   paginaAnterior: () => void;
-  /** Aplicar filtros (reseta para página 0) */
   aplicarFiltros: (filtros: Partial<ComparecimentosPaginadosParams>) => void;
-  /** Limpar filtros */
   limparFiltros: () => void;
-  /** Forçar recarregamento */
   refetch: () => void;
 }
 
-// ── Estado inicial ──────────────────────────────────────────
-
-const PAGINACAO_INICIAL: PaginacaoMeta = {
-  paginaAtual: 0,
-  totalPaginas: 0,
-  totalItens: 0,
-  itensPorPagina: 50,
-  temProxima: false,
-  temAnterior: false,
+const ROTULOS_TIPO: Record<string, string> = {
+  presencial: 'Presencial',
+  online: 'Online',
+  cadastro_inicial: 'Cadastro Inicial',
+  falta_justificada: 'Falta Justificada',
 };
 
-// ── Utilitário para normalizar tipo de validação ────────────
-
-const TipoValidacaoUtils = {
-  normalize(tipo: string): string {
-    return tipo.toLowerCase();
-  },
-  format(tipo: string): string {
-    const f: Record<string, string> = {
-      presencial: 'Presencial',
-      online: 'Online',
-      cadastro_inicial: 'Cadastro Inicial',
-    };
-    return f[tipo.toLowerCase()] || tipo;
-  },
+const formatarData = (data: string): string => {
+  if (!data) return '';
+  const [y, m, d] = data.split('-');
+  return `${d}/${m}/${y}`;
 };
 
-// ── Hook principal ──────────────────────────────────────────
-
-export function useComparecimentosPaginados(
-  options: UseComparecimentosPaginadosOptions = {}
-): UseComparecimentosPaginadosReturn {
+export function useComparecimentosPaginados(options: Options = {}): Retorno {
   const { size = 50, autoLoad = true, filtrosIniciais = {} } = options;
 
-  // Estado dos dados
-  const [comparecimentos, setComparecimentos] = useState<ComparecimentoComProcesso[]>([]);
-  const [paginacao, setPaginacao] = useState<PaginacaoMeta>({
-    ...PAGINACAO_INICIAL,
-    itensPorPagina: size,
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Estado dos parâmetros
-  const [params, setParams] = useState<ComparecimentosPaginadosParams>({
-    page: 0,
-    size,
-    dataInicio: filtrosIniciais.dataInicio,
-    dataFim: filtrosIniciais.dataFim,
-    tipoValidacao: filtrosIniciais.tipoValidacao,
-    natureza: filtrosIniciais.natureza,
-    custodiadoNome: filtrosIniciais.custodiadoNome,
-    numeroProcesso: filtrosIniciais.numeroProcesso,
-  });
-
-  // Ref para cancelar requisições pendentes
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  /**
-   * Busca comparecimentos no backend com paginação server-side.
-   *
-   * CORREÇÃO 2: O backend agora retorna `numeroProcesso` em cada item,
-   * então NÃO fazemos mais o loop de busca de processos separadamente.
-   *
-   * CORREÇÃO 3: Enviamos page, size e filtros. O backend aplica no SQL.
-   * Não pedimos mais size=1000.
-   */
-  const buscar = useCallback(async (parametros: ComparecimentosPaginadosParams) => {
-    // Cancelar requisição anterior
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Montar query params apenas com valores definidos
-      const queryParams: Record<string, string | number> = {
-        page: parametros.page,
-        size: parametros.size,
-      };
-      if (parametros.dataInicio) queryParams.dataInicio = parametros.dataInicio;
-      if (parametros.dataFim) queryParams.dataFim = parametros.dataFim;
-      if (parametros.tipoValidacao) queryParams.tipoValidacao = parametros.tipoValidacao;
-      if (parametros.natureza) queryParams.natureza = parametros.natureza;
-      if (parametros.custodiadoNome) queryParams.custodiadoNome = parametros.custodiadoNome;
-      if (parametros.numeroProcesso) queryParams.numeroProcesso = parametros.numeroProcesso;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await httpClient.get<any>('/comparecimentos/todos', queryParams);
-
-      // Ignorar se requisição cancelada
-      if (abortControllerRef.current?.signal.aborted) return;
-
-      if (response.success && response.data) {
-        const dados = response.data;
-
-        // Extrair lista de comparecimentos da resposta
-        // O backend pode retornar em diferentes formatos
-        let lista: ComparecimentoComProcesso[] = [];
-        if (dados.comparecimentos && Array.isArray(dados.comparecimentos)) {
-          lista = dados.comparecimentos;
-        } else if (dados.data?.comparecimentos && Array.isArray(dados.data.comparecimentos)) {
-          lista = dados.data.comparecimentos;
-        } else if (Array.isArray(dados)) {
-          lista = dados;
-        } else if (Array.isArray(dados.data)) {
-          lista = dados.data;
-        }
-
-        // Formatar campos para exibição
-        const formatados = lista.map((item: ComparecimentoComProcesso) => ({
-          ...item,
-          // CORREÇÃO 2: numeroProcesso já vem preenchido pelo backend.
-          // Não precisamos mais buscar processos separadamente.
-          tipoValidacaoFormatado: TipoValidacaoUtils.format(item.tipoValidacao || ''),
-          dataFormatada: formatarData(item.dataComparecimento),
-          horaFormatada: item.horaComparecimento
-            ? item.horaComparecimento.substring(0, 5)
-            : '—',
-        }));
-
-        setComparecimentos(formatados);
-
-        // Atualizar metadados de paginação
-        const meta = dados.data || dados;
-        if (meta.totalPaginas !== undefined) {
-          setPaginacao({
-            paginaAtual: meta.paginaAtual ?? parametros.page,
-            totalPaginas: meta.totalPaginas ?? 1,
-            totalItens: meta.totalItens ?? 0,
-            itensPorPagina: meta.itensPorPagina ?? parametros.size,
-            temProxima: meta.temProxima ?? false,
-            temAnterior: meta.temAnterior ?? false,
-          });
-        } else {
-          // Fallback se backend não enviar metadados de paginação
-          setPaginacao({
-            paginaAtual: parametros.page,
-            totalPaginas: 1,
-            totalItens: formatados.length,
-            itensPorPagina: parametros.size,
-            temProxima: false,
-            temAnterior: parametros.page > 0,
-          });
-        }
-      } else {
-        throw new Error(response.message || 'Erro ao carregar comparecimentos');
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-
-      console.error('[useComparecimentosPaginados] Erro:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao carregar comparecimentos');
-      setComparecimentos([]);
-      setPaginacao(PAGINACAO_INICIAL);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Carregar quando params mudam
-  useEffect(() => {
-    if (autoLoad) {
-      buscar(params);
-    }
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, [params, buscar, autoLoad]);
-
-  // ── Ações ─────────────────────────────────────────────────
-
-  const irParaPagina = useCallback((page: number) => {
-    setParams(prev => ({ ...prev, page }));
-  }, []);
-
-  const proximaPagina = useCallback(() => {
-    if (paginacao.temProxima) {
-      setParams(prev => ({ ...prev, page: prev.page + 1 }));
-    }
-  }, [paginacao.temProxima]);
-
-  const paginaAnterior = useCallback(() => {
-    if (paginacao.temAnterior) {
-      setParams(prev => ({ ...prev, page: Math.max(0, prev.page - 1) }));
-    }
-  }, [paginacao.temAnterior]);
-
-  const aplicarFiltros = useCallback(
-    (filtros: Partial<ComparecimentosPaginadosParams>) => {
-      setParams(prev => ({
-        ...prev,
-        ...filtros,
-        page: 0, // Voltar para primeira página ao filtrar
-      }));
+  const nucleo = usePaginacao<ComparecimentosPaginadosParams, ComparecimentoComProcesso>({
+    endpoint: '/comparecimentos/todos',
+    autoLoad,
+    mensagemErro: 'Erro ao carregar comparecimentos',
+    paramsIniciais: {
+      page: 0,
+      size,
+      dataInicio: filtrosIniciais.dataInicio,
+      dataFim: filtrosIniciais.dataFim,
+      tipoValidacao: filtrosIniciais.tipoValidacao,
+      natureza: filtrosIniciais.natureza,
+      custodiadoNome: filtrosIniciais.custodiadoNome,
+      numeroProcesso: filtrosIniciais.numeroProcesso,
     },
-    []
-  );
-
-  const limparFiltros = useCallback(() => {
-    setParams({ page: 0, size });
-  }, [size]);
-
-  const refetch = useCallback(() => {
-    buscar(params);
-  }, [buscar, params]);
+    extrairLista: dados => {
+      if (Array.isArray(dados.comparecimentos)) return dados.comparecimentos;
+      const aninhado = dados.data as Record<string, unknown> | undefined;
+      if (aninhado && Array.isArray(aninhado.comparecimentos)) return aninhado.comparecimentos;
+      if (Array.isArray(dados)) return dados;
+      if (Array.isArray(dados.data)) return dados.data;
+      return [];
+    },
+    mapearItem: bruto => {
+      const item = bruto as ComparecimentoComProcesso;
+      const tipo = (item.tipoValidacao || '').toLowerCase();
+      return {
+        ...item,
+        tipoValidacaoFormatado: ROTULOS_TIPO[tipo] || item.tipoValidacao,
+        dataFormatada: formatarData(item.dataComparecimento),
+        horaFormatada: item.horaComparecimento ? item.horaComparecimento.substring(0, 5) : '—',
+      };
+    },
+  });
 
   return {
-    comparecimentos,
-    paginacao,
-    loading,
-    error,
-    filtrosAtivos: params,
-    irParaPagina,
-    proximaPagina,
-    paginaAnterior,
-    aplicarFiltros,
-    limparFiltros,
-    refetch,
+    comparecimentos: nucleo.itens,
+    paginacao: nucleo.paginacao,
+    loading: nucleo.loading,
+    error: nucleo.error,
+    filtrosAtivos: nucleo.filtrosAtivos,
+    irParaPagina: nucleo.irParaPagina,
+    proximaPagina: nucleo.proximaPagina,
+    paginaAnterior: nucleo.paginaAnterior,
+    aplicarFiltros: nucleo.aplicarFiltros,
+    limparFiltros: () => nucleo.limparFiltros({ page: 0, size }),
+    refetch: nucleo.refetch,
   };
-}
-
-// ── Utilitários internos ────────────────────────────────────
-
-function formatarData(data: string): string {
-  if (!data) return '';
-  try {
-    const [y, m, d] = data.split('-').map(Number);
-    return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
-  } catch {
-    return data;
-  }
 }
