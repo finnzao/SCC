@@ -1,9 +1,9 @@
 'use client';
 
 // Wrapper fino sobre usePaginacao: so a configuracao da listagem de pessoas
-// (endpoint, defaults, ordenacao e os gatilhos de refetch entre telas).
+// (endpoint, defaults e a ordenacao com toggle asc/desc).
 
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { usePaginacao } from '@/hooks/usePaginacao';
 import type { PessoaMonitoradaListItem } from '@/types/api';
 import type { PessoasMonitoradasPaginadosParams, PaginacaoMeta } from '@/types/pagination';
@@ -59,29 +59,8 @@ export function usePessoasMonitoradasPaginados(options: Options = {}): Retorno {
 
   const { refetch } = nucleo;
 
-  // outras telas avisam que a lista envelheceu (registro/edicao em outra rota)
-  useEffect(() => {
-    const handler = () => refetch();
-    window.addEventListener('comparecimento-registrado', handler);
-    window.addEventListener('custodiado-atualizado', handler);
-    return () => {
-      window.removeEventListener('comparecimento-registrado', handler);
-      window.removeEventListener('custodiado-atualizado', handler);
-    };
-  }, [refetch]);
-
-  useEffect(() => {
-    const consumirNeedsRefetch = () => {
-      if (sessionStorage.getItem('needsRefetch') === 'true') {
-        sessionStorage.removeItem('needsRefetch');
-        sessionStorage.removeItem('lastUpdate');
-        refetch();
-      }
-    };
-    consumirNeedsRefetch();
-    window.addEventListener('focus', consumirNeedsRefetch);
-    return () => window.removeEventListener('focus', consumirNeedsRefetch);
-  }, [refetch]);
+  // B3 do review: os gatilhos needsRefetch/eventos de janela eram listeners sem
+  // emissor (codigo morto) — a lista ja recarrega no mount de cada navegacao.
 
   const ordenarPor = useCallback((
     campo: PessoasMonitoradasPaginadosParams['ordenarPor'],
