@@ -239,7 +239,6 @@ class AuthService {
     return null;
   }
 
-  // eslint-disable-next-line no-unused-vars
   setRefreshToken(_token: string): void {}
 
   getRefreshToken(): string | null {
