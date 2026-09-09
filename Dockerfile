@@ -1,5 +1,7 @@
 # Multi-stage build para Next.js
 FROM node:18-alpine AS base
+# pnpm via corepack: a versao vem do package.json#packageManager
+RUN corepack enable
 
 # Instalar dependências apenas quando necessário
 FROM base AS deps
@@ -7,8 +9,8 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copiar arquivos de dependências
-COPY package.json package-lock.json* ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Rebuild do código fonte apenas quando necessário
 FROM base AS builder
@@ -32,7 +34,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 # Fazer build da aplicação
-RUN npm run build
+RUN pnpm run build
 
 # Imagem de produção
 FROM base AS runner

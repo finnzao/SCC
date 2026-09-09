@@ -2,6 +2,7 @@
 # local para dentro da imagem — build lento e, pior, binários compilados para outro
 # sistema operacional sobrescrevendo os que o "npm ci" instalou no container.
 node_modules
+node_modules.old
 .next
 out
 build
